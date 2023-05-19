@@ -2,7 +2,7 @@
 Well placement optimization for CO2 injection
 
 <p align="center">
-  <img src="https://github.com/misaelmmorales/CO2-Placement-Optim/blob/main/figures/logperm.png" width="400"/>
+  <img src="https://github.com/misaelmmorales/CO2-Placement-Optim/blob/main/figures/logperm.png" width="250"/>
 </p>
 
 <p align="center">
