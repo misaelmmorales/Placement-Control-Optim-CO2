@@ -3,9 +3,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from scipy.io import loadmat
 
-def plot_well_locs(wdata, kdata, figsize=(4,4), color='k', cmap='jet', 
-                   title='Random Well Locations', xlab='X index', ylab='Y index',
-                   cbar_label='$log(k_x)$ [log-mD]'):
+def plot_well_locs(wdata, kdata, figsize=(4,4), color='k', cmap='jet', title='Random Well Locations', xlab='X index', ylab='Y index', cbar_label='$log(k_x)$ [log-mD]'):
     plt.figure(figsize=figsize)
     plt.scatter(wdata[:,0], wdata[:,1], c=color)
     im = plt.imshow(kdata, cmap=cmap, aspect='auto')
@@ -13,16 +11,14 @@ def plot_well_locs(wdata, kdata, figsize=(4,4), color='k', cmap='jet',
     plt.xlabel(xlab); plt.ylabel(ylab)
     plt.title(title)
     
-def plot_bhps(bhpdata, timedata, realization, figsize=(6,4), 
-              title='BHP vs. Time', xlab='Time [yrs]', ylab='BHP [psia]'):
+def plot_bhps(bhpdata, timedata, realization, figsize=(6,4), title='BHP vs. Time', xlab='Time [yrs]', ylab='BHP [psia]'):
     plt.figure(figsize=figsize)
     for k in realization:
         plt.plot(timedata, bhpdata[k], label='Realization {}'.format(k))
     plt.title(title); plt.xlabel(xlab); plt.ylabel(ylab)
     plt.legend(); plt.grid('on')
     
-def plot_static(poro, perm, well_loc, ncols, multiplier=1, 
-                cmaps=['jet','jet'], figsize=(15,5)):
+def plot_static(poro, perm, well_loc, ncols, multiplier=1, cmaps=['jet','jet'], figsize=(15,5)):
     logpermx = np.log10(perm[:,:,0])
     fig, axs = plt.subplots(2, ncols, figsize=figsize, facecolor='white')
     for j in range(ncols):
@@ -37,20 +33,20 @@ def plot_static(poro, perm, well_loc, ncols, multiplier=1,
     plt.colorbar(im0, label='$\phi$ [v/v]', fraction=0.046, pad=0.04)
     plt.colorbar(im1, label='$log(k_x)$ [log-mD]', fraction=0.046, pad=0.04)
 
-def plot_dynamic(data, well_loc, ncols, multiplier=1, 
-                 cmap='jet', figsize=(18,4), title='Dynamic'):
-    j_timesteps = np.insert(np.linspace(0, 60, 13, dtype='int')[1:]-1, 0, 0)
-    k = 0 
-    fig, axs = plt.subplots(ncols, 13, figsize=figsize)
-    plt.suptitle(title)
-    for i in range(ncols):
-        for j in range(13):
-            axs[i,j].imshow(data[k,:,:,j_timesteps[j]], cmap=cmap)
-            axs[i,j].scatter(well_loc[k][0], well_loc[k][1], c='k', marker='o')
-            axs[0,j].set(title='t={}'.format(j_timesteps[j]+1))
+def plot_dynamic(ddata, sdata, well_loc, nrows, multiplier=1, cmap='jet', figsize=(18,4), dtitle='Dynamic', stitle='Static'):
+    k, j_timesteps = 0, np.insert(np.linspace(0, 60, 13, dtype='int')[1:]-1, 0, 0)
+    fig, axs = plt.subplots(nrows, len(j_timesteps)+1, figsize=figsize)
+    plt.suptitle(dtitle)
+    for i in range(nrows):
+        ims=axs[i,0].imshow(sdata, cmap='jet'); axs[i,0].set(xticks=[], yticks=[]); axs[0,0].set_title(stitle)
+        for j in range(len(j_timesteps)):
+            imd=axs[i,j+1].imshow(ddata[k,:,:,j_timesteps[j]], cmap=cmap)
+            axs[0,j+1].set(title='t={}'.format(j_timesteps[j]+1))
             axs[i,0].set(ylabel='n={}'.format(k))
-            axs[i,j].set(xticks=[], yticks=[])
-        k += multiplier
+            axs[i,j+1].set(xticks=[], yticks=[])
+        for j in range(len(j_timesteps)+1):
+            axs[i,j].scatter(well_loc[k][0], well_loc[k][1], c='k', marker='o')
+        k += multiplier  
 
 def load_data(nx=32, ny=32, nt=60, nR=100, save=False, verbose=True):
     logperm    = np.array(pd.read_csv('simulations/perm_realization.csv')).reshape(nx,ny)
