@@ -1,9 +1,9 @@
 %% Main variables
 clear; close all; clc
-%set(0,'DefaultFigureWindowStyle','docked')
+set(0,'DefaultFigureWindowStyle','docked')
 
 % Import MRST module
-mrstModule add SPE10 co2lab
+mrstModule add SPE10 co2lab mrst-gui
 mrstModule add ad-core ad-props ad-blackoil
 
 % Define global variables
@@ -11,7 +11,7 @@ dims = 32;
 
 %% Make Grid
 nx=dims; ny=dims; nz=1; 
-dx=1000*meter; dy=1000*meter; dz=50*meter; 
+dx=1000*meter; dy=1000*meter; dz=100*meter;
 
 % Make cartesian grid
 G = cartGrid([nx ny nz], [dx dy dz]);
@@ -19,7 +19,7 @@ G = computeGeometry(G);
 
 %% Make Rock
 logperm = readmatrix('perm_realization.csv');
-random = 0.2*randn([1024,1]);
+random = 0.2*randn([dims*dims,1]);
 
 poro = 10.^((logperm-7)/10);
 permx = (10.^(0.25+logperm+random))*milli*darcy;
@@ -35,7 +35,9 @@ save('porosity.mat', 'poro')
 %% Make Initial State
 gravity on;  g = gravity;
 rhow = 1000; % density of brine corresponding to 94 degrees C and 300 bar
-initState.pressure = G.cells.centroids(:,3) * 400*psia;
+%initState.pressure = G.cells.centroids(:,3) * 400*psia; %G.cells.centroids=3
+P0 = 4000*psia; 
+initState.pressure = repmat(P0, 1024,1);
 initState.s = repmat([1, 0], G.cells.num, 1);
 initState.sGmax = initState.s(:,2);
 
@@ -88,7 +90,7 @@ save('time_yr.mat', 'cum_time')
 irate = sum(poreVolume(G, rock))/(total_time);
 
 %% Run Simulations
-N_realization = 100;
+N_realization = 2;
 
 well_locations = cell(N_realization,1);
 results = cell(1,N_realization);
@@ -107,11 +109,11 @@ save('results.mat', 'results')
 well_locations = cell2mat(well_locations);
 save('well_locations.mat', 'well_locations')
 
-pressure = zeros(100,32*32,60);
-saturation = zeros(100,32*32,60);
-bhp = zeros(100,60);
-for i=1:100
-    for j=1:60
+pressure = zeros(N_realization,dims*dims,length(timestep));
+saturation = zeros(N_realization,dims*dims,length(timestep));
+bhp = zeros(N_realization,length(timestep));
+for i=1:N_realization
+    for j=1:length(timestep)
         pressure(i,:,j) = convertTo(results{1,i}{j,1}.pressure, psia);
         saturation(i,:,j) = results{1,i}{j,1}.s(:,2);
         bhp(i,j) = convertTo(results{1,i}{j,1}.wellSol.bhp, psia);
@@ -123,6 +125,8 @@ save('bhp.mat', 'bhp')
 
 %% Plots
 %{
+figure; plotToolbar(G, results{1}); colormap jet
+
 figure; 
 plotCellData(G, rock.poro); 
 plotWell(G, W, 'color', 'k');
