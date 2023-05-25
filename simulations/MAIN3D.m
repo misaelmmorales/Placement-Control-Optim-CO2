@@ -3,39 +3,62 @@ clear; close all; clc
 set(0,'DefaultFigureWindowStyle','docked')
 
 % Import MRST module
-mrstModule add SPE10 co2lab mrst-gui
+mrstModule add SPE10 coarsegrid upscaling co2lab mrst-gui
 mrstModule add ad-core ad-props ad-blackoil
 
 %% Make Grid
-dims = 32;
-nx=dims; ny=dims; nz=1; 
-dx=1000*meter; dy=1000*meter; dz=100*meter;
+dims = 32; nz=5;
+dx=1000*meter; dy=1000*meter; dz=500*meter;
 
-% Make cartesian grid
-G = cartGrid([nx ny nz], [dx dy dz]);
+G = cartGrid([dims, dims, nz], [dx, dy, dz]);
 G = computeGeometry(G);
 
-%% Make Rock
-logperm = readmatrix('perm_realization.csv');
-random = 0.2*randn([dims*dims,1]);
+G10 = computeGeometry(cartGrid([60,220,5], [dx dy dz]));
 
-poro = 10.^((logperm-7)/10);
-permx = (10.^(0.25+logperm+random))*milli*darcy;
-permy = permx;
-permz = 0.1*permx;
-perm = [permx, permy, permz];
-rock = makeRock(G, perm, poro);
+%% Make rock
+[poro1, perm1] = make_rock_layers(1,2);
+poro2 = gaussianField(G10.cartDims, [0.05,0.08], [11,3,1], 2.5);
+perm2 = reshape(logNormLayers(G10.cartDims, [0.1, 0.1])*milli*darcy, G10.cartDims);
+[poro3, perm3] = make_rock_layers(75,76);
+
+poro10 = cat(3, poro1, poro2(:,:,1), poro3);
+permx10 = cat(3, perm1, perm2(:,:,1), perm3);
+
+[poro, permx] = deal(zeros(dims,dims,nz));
+for i=1:nz
+    poro(:,:,i) = imresize(poro10(:,:,i), [dims,dims], 'nearest');
+    permx(:,:,i) = imresize(permx10(:,:,i), [dims,dims], 'nearest'); %antialiasing=false
+end
+poro = reshape(poro, [], 1)+0.05;
+permx = reshape(permx, [], 1);
+[perm(:,1), perm(:,2)] = deal(permx);
+perm(:,3) = 0.1*permx;
+rock.poro = poro;
+rock.perm = perm;
 
 permeability = convertTo(perm, milli*darcy);
-save('permeability.mat', 'permeability')
-save('porosity.mat', 'poro')
+save('permeability3d.mat', 'permeability')
+save('porosity3d.mat', 'poro')
+
+clear i poro1 poro2 poro3 perm1 perm2 perm3
+clear permeability permx perm poro
+
+%% Plots
+figure(1)
+plotCellData(G10, reshape(poro10,[],1)); colormap jet; view(-70,80); colorbar
+figure(2)
+plotCellData(G10, log10(convertTo(reshape(permx10,[],1), milli*darcy))); colormap jet; view(-70,80); colorbar
+figure(3)
+plotCellData(G, rock.poro); colormap jet; colorbar; view(-70,80)
+figure(4)
+plotCellData(G, log10(convertTo(rock.perm(:,1),milli*darcy))); colormap jet; colorbar; view(-70,80)
 
 %% Make Initial State
 gravity on;  g = gravity;
 rhow = 1000; % density of brine corresponding to 94 degrees C and 300 bar
 %initState.pressure = G.cells.centroids(:,3) * 400*psia; %G.cells.centroids=3
 P0 = 4000*psia; 
-initState.pressure = repmat(P0, 1024,1);
+initState.pressure = repmat(P0, dims*dims*nz, 1);
 initState.s = repmat([1, 0], G.cells.num, 1);
 initState.sGmax = initState.s(:,2);
 
@@ -81,64 +104,45 @@ bc = addBC(bc, bc_face_ix, 'pressure', p_face_pressure, 'sat', [1,0]);
 
 %% Define Timesteps
 total_time = 5*year;
-timestep = rampupTimesteps(total_time, year/12, 0);
+timestep = rampupTimesteps(total_time, year/12, 10);
 cum_time = convertTo(cumsum(timestep), year);
 save('time_yr.mat', 'cum_time')
 
 irate = sum(poreVolume(G, rock))/(total_time);
 
 %% Run Simulations
-N_realization = 1;
+N_realization = 2;
 
-well_locations = cell(N_realization,1);
-results = cell(1,N_realization);
+results = cell(1, N_realization);
 
 parfor i=1:N_realization
-    inj_loc = randi([4,28],[1,2]);
-    W = gen_wells(G, rock, inj_loc, irate);
+    %{
+    loc_inj = randi([4,28], [1,2]);
+    
+    num_moni = randi(5);
+    loc_moni = randi([4,28], [num_moni,2]);
+
+    temp_poro = reshape(rock.poro, [G.cartDims]);
+    temp_perm = reshape(rock.perm(:,1), [G.cartDims]);
+
+    rand_perm = abs(mean(rock.perm(:,1)) + std(rock.perm(:,1))*randn([num_moni,1]));
+    rand_poro = 10.^((log10(convertTo(rand_perm,milli*darcy))-7)/10);
+
+    temp_poro(loc_moni(:,1), loc_moni(:,2), :) = repmat(rand_poro', [nz,1]);
+    temp_perm(loc_moni(:,1), loc_moni(:,2), :) = repmat(rand_perm', [nz,1]);
+
+    rock.poro = reshape(temp_poro, [], 1);
+    rock.perm = reshape(temp_perm, [], 1);
+    %}
+    
+    W = gen_wells_3d(G, rock, loc_inj, nz, irate);
     [schedule, dT1] = gen_schedule(W, bc, timestep);
     [model, wellSol, states] = gen_simulation(G, rock, fluid, initState, schedule);
-    well_locations{i} = inj_loc;
+    well_locations{i} = [loc_inj, loc_moni];
     results{i} = states;
 end
-save('results.mat', 'results')
 
-%% Collect Results
-well_locations = cell2mat(well_locations);
-save('well_locations.mat', 'well_locations')
+%% Plot
+figure; plotToolbar(G, results{1}); view(-70,80); colormap jet; colorbar
 
-pressure = zeros(N_realization,dims*dims,length(timestep));
-saturation = zeros(N_realization,dims*dims,length(timestep));
-bhp = zeros(N_realization,length(timestep));
-for i=1:N_realization
-    for j=1:length(timestep)
-        pressure(i,:,j) = convertTo(results{1,i}{j,1}.pressure, psia);
-        saturation(i,:,j) = results{1,i}{j,1}.s(:,2);
-        bhp(i,j) = convertTo(results{1,i}{j,1}.wellSol.bhp, psia);
-    end
-end
-save('pressure.mat','pressure')
-save('saturation.mat','saturation')
-save('bhp.mat', 'bhp')
-
-%% Plots
-%{
-figure; plotToolbar(G, results{1}); colormap jet
-
-figure; 
-plotCellData(G, rock.poro); 
-plotWell(G, W, 'color', 'k');
-title('Porosity & Well Locations'); xlabel('X [m]'); ylabel('Y [m]')
-view(-50,85); colormap jet; h=colorbar; h.Label.String = 'Porosity [v/v]';
-
-figure; plotCellData(G, states{1}.s(:,1)); colormap jet; view(-50,85)
-figure; plotCellData(G, states{end}.s(:,1)); colormap jet; view(-50,85)
-
-bhp_inj = zeros(length(timestep),1);
-for i=1:length(timestep)
-    bhp_inj(i) = convertTo(states{i}.wellSol(1).bhp, psia);
-end
-figure; plot(cum_time, bhp_inj, 'DisplayName','Injector');
-legend; title('BHP vs. Time'); xlabel('Time [years]'); ylabel('BHP [psia]')
-%}
 %% END
