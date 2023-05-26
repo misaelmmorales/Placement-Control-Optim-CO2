@@ -110,7 +110,7 @@ cum_time = convertTo(cumsum([inj_timesteps; mon_timesteps]), year);
 irate = 0.25*sum(poreVolume(G, rock))/(mon_time);
 
 %% Run Simulations
-N_realization = 10;
+N_realization = 50;
 
 modrock = cell(N_realization, 1);
 results  = cell(N_realization, 1);
@@ -133,6 +133,23 @@ parfor i=1:N_realization
     results{i} = states;
     modrock{i} = newrock;
 end
+
+%% Collect Results
+%{
+inj_locations = cell2mat(inj_locations);
+
+pressure = zeros(N_realization,dims*dims,length(timestep));
+saturation = zeros(N_realization,dims*dims,length(timestep));
+bhp = zeros(N_realization,length(timestep));
+
+for i=1:N_realization
+    for j=1:length(timestep)
+        pressure(i,:,j) = convertTo(results{1,i}{j,1}.pressure, psia);
+        saturation(i,:,j) = results{1,i}{j,1}.s(:,2);
+        bhp(i,j) = convertTo(results{1,i}{j,1}.wellSol.bhp, psia);
+    end
+end
+%}
 
 %% Plots
 

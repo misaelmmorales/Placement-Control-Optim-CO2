@@ -25,10 +25,7 @@ permy = permx;
 permz = 0.1*permx;
 perm = [permx, permy, permz];
 rock = makeRock(G, perm, poro);
-
 permeability = convertTo(perm, milli*darcy);
-save('permeability.mat', 'permeability')
-save('porosity.mat', 'poro')
 
 %% Make Initial State
 gravity on;  g = gravity;
@@ -83,12 +80,11 @@ bc = addBC(bc, bc_face_ix, 'pressure', p_face_pressure, 'sat', [1,0]);
 total_time = 5*year;
 timestep = rampupTimesteps(total_time, year/12, 0);
 cum_time = convertTo(cumsum(timestep), year);
-save('time_yr.mat', 'cum_time')
 
 irate = sum(poreVolume(G, rock))/(total_time);
 
 %% Run Simulations
-N_realization = 1;
+N_realization = 2;
 
 well_locations = cell(N_realization,1);
 results = cell(1,N_realization);
@@ -101,15 +97,14 @@ parfor i=1:N_realization
     well_locations{i} = inj_loc;
     results{i} = states;
 end
-save('results.mat', 'results')
 
 %% Collect Results
 well_locations = cell2mat(well_locations);
-save('well_locations.mat', 'well_locations')
 
 pressure = zeros(N_realization,dims*dims,length(timestep));
 saturation = zeros(N_realization,dims*dims,length(timestep));
 bhp = zeros(N_realization,length(timestep));
+
 for i=1:N_realization
     for j=1:length(timestep)
         pressure(i,:,j) = convertTo(results{1,i}{j,1}.pressure, psia);
@@ -117,9 +112,18 @@ for i=1:N_realization
         bhp(i,j) = convertTo(results{1,i}{j,1}.wellSol.bhp, psia);
     end
 end
+
+%% Save
+%{
+save('permeability.mat', 'permeability')
+save('porosity.mat', 'poro')
+save('time_yr.mat', 'cum_time')
+save('results.mat', 'results')
+save('well_locations.mat', 'well_locations')
 save('pressure.mat','pressure')
 save('saturation.mat','saturation')
 save('bhp.mat', 'bhp')
+%}
 
 %% Plots
 %{
