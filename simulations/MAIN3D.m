@@ -1,8 +1,16 @@
 %% Main variables
 clear; close all; clc
-set(0,'DefaultFigureWindowStyle','docked')
+%set(0,'DefaultFigureWindowStyle','docked')
 
-% Import MRST module
+%{
+current_dir = pwd;
+mrst_dir = 'mrst-2023a';
+cd(mrst_dir)
+startup
+cd(current_dir)
+%}
+
+%% Import MRST module
 mrstModule add SPE10 coarsegrid upscaling co2lab mrst-gui
 mrstModule add ad-core ad-props ad-blackoil
 
@@ -17,9 +25,9 @@ G10 = computeGeometry(cartGrid([60,220,5], [dx dy dz]));
 
 %% Make rock
 [poro1, perm1] = make_rock_layers(1,2);
-poro2 = gaussianField(G10.cartDims, [0.05,0.08], [11,3,1], 2.5);
-perm2 = reshape(logNormLayers(G10.cartDims, [0.1, 0.1])*milli*darcy, G10.cartDims);
-[poro3, perm3] = make_rock_layers(75,76);
+poro2 = gaussianField(G10.cartDims, [0.05,0.08], [11,5,1], 2.5);
+perm2 = reshape(logNormLayers(G10.cartDims, [0.05, 0.05])*milli*darcy, G10.cartDims);
+[poro3, perm3] = make_rock_layers(30,31);
 
 poro10 = cat(3, poro1, poro2(:,:,1), poro3);
 permx10 = cat(3, perm1, perm2(:,:,1), perm3);
@@ -36,22 +44,9 @@ perm(:,3) = 0.1*permx;
 rock.poro = poro;
 rock.perm = perm;
 
-permeability = convertTo(perm, milli*darcy);
-save('permeability3d.mat', 'permeability')
-save('porosity3d.mat', 'poro')
-
+%permeability = convertTo(perm, milli*darcy);
 clear i poro1 poro2 poro3 perm1 perm2 perm3
 clear permeability permx perm poro
-
-%% Plots
-figure(1)
-plotCellData(G10, reshape(poro10,[],1)); colormap jet; view(-70,80); colorbar
-figure(2)
-plotCellData(G10, log10(convertTo(reshape(permx10,[],1), milli*darcy))); colormap jet; view(-70,80); colorbar
-figure(3)
-plotCellData(G, rock.poro); colormap jet; colorbar; view(-70,80)
-figure(4)
-plotCellData(G, log10(convertTo(rock.perm(:,1),milli*darcy))); colormap jet; colorbar; view(-70,80)
 
 %% Make Initial State
 gravity on;  g = gravity;
@@ -103,46 +98,63 @@ p_face_pressure = initState.pressure(bc_cell_ix);
 bc = addBC(bc, bc_face_ix, 'pressure', p_face_pressure, 'sat', [1,0]);
 
 %% Define Timesteps
-total_time = 5*year;
-timestep = rampupTimesteps(total_time, year/12, 10);
-cum_time = convertTo(cumsum(timestep), year);
-save('time_yr.mat', 'cum_time')
+inj_time = 5*year;
+inj_timesteps = rampupTimesteps(inj_time, year/12, 10);
 
-irate = sum(poreVolume(G, rock))/(total_time);
+mon_time = 5*year;
+mon_timesteps = rampupTimesteps(mon_time, year, 0);
+
+total_time = inj_time + mon_time;
+cum_time = convertTo(cumsum([inj_timesteps; mon_timesteps]), year);
+
+irate = 0.25*sum(poreVolume(G, rock))/(mon_time);
 
 %% Run Simulations
-N_realization = 2;
+N_realization = 10;
 
-results = cell(1, N_realization);
+modrock = cell(N_realization, 1);
+results  = cell(N_realization, 1);
+inj_locations = cell(N_realization,1);
+mon_locations = cell(N_realization,1);
 
 parfor i=1:N_realization
-    %{
     loc_inj = randi([4,28], [1,2]);
-    
     num_moni = randi(5);
     loc_moni = randi([4,28], [num_moni,2]);
 
-    temp_poro = reshape(rock.poro, [G.cartDims]);
-    temp_perm = reshape(rock.perm(:,1), [G.cartDims]);
+    newrock = gen_monitorwells(G, rock, num_moni, loc_moni);
+    W = gen_wells_3d(G, newrock, loc_inj, nz, irate);
+    [schedule, dT1, dT2] = gen_schedule_3d(W, bc, inj_timesteps, mon_timesteps);
+    [model, wellSol, states] = gen_simulation(G, newrock, fluid, initState, schedule);
 
-    rand_perm = abs(mean(rock.perm(:,1)) + std(rock.perm(:,1))*randn([num_moni,1]));
-    rand_poro = 10.^((log10(convertTo(rand_perm,milli*darcy))-7)/10);
+    inj_locations{i} = loc_inj;
+    mon_locations{i} = loc_moni;
 
-    temp_poro(loc_moni(:,1), loc_moni(:,2), :) = repmat(rand_poro', [nz,1]);
-    temp_perm(loc_moni(:,1), loc_moni(:,2), :) = repmat(rand_perm', [nz,1]);
-
-    rock.poro = reshape(temp_poro, [], 1);
-    rock.perm = reshape(temp_perm, [], 1);
-    %}
-    
-    W = gen_wells_3d(G, rock, loc_inj, nz, irate);
-    [schedule, dT1] = gen_schedule(W, bc, timestep);
-    [model, wellSol, states] = gen_simulation(G, rock, fluid, initState, schedule);
-    well_locations{i} = [loc_inj, loc_moni];
     results{i} = states;
+    modrock{i} = newrock;
 end
 
-%% Plot
-figure; plotToolbar(G, results{1}); view(-70,80); colormap jet; colorbar
+%% Plots
+
+%{
+figure
+plotCellData(G10, reshape(poro10,[],1)); colormap jet; view(-70,80); colorbar
+figure
+plotCellData(G10, log10(convertTo(reshape(permx10,[],1), milli*darcy))); colormap jet; view(-70,80); colorbar
+figure
+plotCellData(G, rock.poro); colormap jet; colorbar; view(-70,80)
+figure
+plotCellData(G, log10(convertTo(rock.perm(:,1),milli*darcy))); colormap jet; colorbar; view(-70,80)
+
+figure
+sat_end = results{1,1}{end,1}.s(:,2);  % co2 saturation at end state
+plume_cells = sat_end > 0.05;
+clf; plotGrid(G, 'facecolor', 'none');
+plotGrid(G, plume_cells, 'facecolor', 'red')
+view(-70, 80);
+
+figure
+plotToolbar(G, results{1}); view(-70,80); colormap jet; colorbar
+%}
 
 %% END
