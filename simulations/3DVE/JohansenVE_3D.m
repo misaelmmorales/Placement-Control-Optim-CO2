@@ -46,11 +46,11 @@ while isempty(W)
             mc_global = false(G.cartDims);
             mc_global(mon_idx(i,1), mon_idx(i,2), :) = true;
             mc = find(mc_global(G.cells.indexMap));
-        
+            
             max_perm = 1.5*max(rock.perm);
             rand_perm = max_perm + (3*max_perm-max_perm)*rand;
             rock.perm(mc,:) = repmat(rand_perm, size(mc,1), 1);
-
+            
             Wm = addWell(Wm, G, rock, mc, 'name',['Monitor ', int2str(i)]);
         end
     end
