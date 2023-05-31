@@ -30,7 +30,7 @@ mon_num = randi([1,5]);
 
 % Setup the well
 while isempty(W)
-    inj_idx = randi([25,75], [1,2]);
+    inj_idx = randi(100, [1,2]);
     wc_global = false(G.cartDims); 
     wc_global(inj_idx(1), inj_idx(2), 6:10) = true;
     wc = find(wc_global(G.cells.indexMap));
@@ -135,6 +135,22 @@ model = CO2VEBlackOilTypeModel(Gt, rock2D, fluid);
 [wellSol, states] = simulateScheduleAD(initState, model, schedule);
 states = [{initState} states(:)'];
 
+%% Plot
+hs     = [];
+time   = cumsum([0; schedule.step.val])/year;
+period = [1; schedule.step.control];
+ptxt   = {'injection','migration'};
+figure 
+view(-70,30); colormap jet
+plotWell(G, Wm); plotWell(G, W, 'color','k')
+for i=1:numel(states)
+    delete(hs)
+    hs = plotCellData(Gt, states{1,i}.s(:,2)); drawnow
+    title(sprintf('Time: %4d yrs (%s)', time(i),ptxt{period(i)}));
+end
+
+sum(poreVolume(G, rock)) * sum(states{1,end}.s(:,2))/100
+
 %% Animate the plume migration over the whole simulation period
 figure
 oG = generateCoarseGrid(Gt.parent, ones(Gt.parent.cells.num,1));
@@ -159,20 +175,6 @@ for i=1:numel(states)
     title(sprintf('Time: %4d yrs (%s)', time(i),ptxt{period(i)}));
     ix = sat>0; if ~any(ix), continue; end
     hs = plotCellData(Gt.parent, sat, ix); drawnow
-end
-
-
-%%
-hs     = [];
-time   = cumsum([0; schedule.step.val])/year;
-period = [1; schedule.step.control];
-ptxt   = {'injection','migration'};
-figure; view(-70,30); colormap jet
-plotWell(G, Wm); plotWell(G, W)
-for i=1:numel(states)
-    delete(hs)
-    hs = plotCellData(Gt, states{1,i}.s(:,2)); drawnow
-    title(sprintf('Time: %4d yrs (%s)', time(i),ptxt{period(i)}));
 end
 
 %% Trapping inventory
