@@ -155,7 +155,7 @@ sum(poreVolume(G, rock)) * sum(states{1,end}.s(:,2))/100
 figure
 oG = generateCoarseGrid(Gt.parent, ones(Gt.parent.cells.num,1));
 plotFaces(oG, 1:oG.faces.num,'FaceColor','none');
-plotWell(Gt.parent, W,'FontSize',10);
+plotWell(Gt.parent, W, 'FontSize',10);
 plotWell(Gt.parent, Wm, 'color' ,'r');
 view(-70, 30); colorbar, clim([0,1]); colormap jet;
 hs     = [];
