@@ -119,8 +119,8 @@ mon_locations = cell(N_realization,1);
 
 parfor i=1:N_realization
     loc_inj = randi([4,28], [1,2]);
-    num_moni = randi(5);
-    loc_moni = randi([4,28], [num_moni,2]);
+    num_moni = randi(7);
+    loc_moni = randi([2,30], [num_moni,2]);
 
     newrock = gen_monitorwells(G, rock, num_moni, loc_moni);
     W = gen_wells_3d(G, newrock, loc_inj, nz, irate);
@@ -133,6 +133,9 @@ parfor i=1:N_realization
     results{i} = states;
     modrock{i} = newrock;
 end
+% max(max(reshape(results{20,1}{end,1}.s(:,2), [32,32,5])))
+% plot(reshape(max(max(reshape(results{44,1}{end,1}.s(:,2), [32,32,5]))), [], 1))
+
 
 %% Collect Results
 %{
