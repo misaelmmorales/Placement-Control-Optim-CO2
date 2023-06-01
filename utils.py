@@ -2,7 +2,44 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 from scipy.io import loadmat
+import tensorflow as tf
 
+def check_tensorflow_gpu():
+    sys_info = tf.sysconfig.get_build_info()
+    print('Tensorflow built with CUDA?',  tf.test.is_built_with_cuda())
+    print('Tensorflow version:', tf.__version__)
+    print('# GPU available:', len(tf.config.experimental.list_physical_devices('GPU')))
+    print("CUDA: {} | cuDNN: {}".format(sys_info["cuda_version"], sys_info["cudnn_version"]))
+    print(tf.config.list_physical_devices())
+    return None
+
+#################### DATALOADER ####################
+def load_data(nx=32, ny=32, nt=60, nR=100, save=False, verbose=True):
+    logperm    = np.array(pd.read_csv('simulations/perm_realization.csv')).reshape(nx,ny)
+    perm       = loadmat('data_mat/permeability.mat')['permeability'].reshape(nx,ny,3)
+    poro       = loadmat('data_mat/porosity.mat')['poro'].reshape(nx,ny)
+    timesteps  = loadmat('data_mat/time_yr.mat')['cum_time']
+    bhp        = loadmat('data_mat/bhp.mat')['bhp']
+    pressure   = loadmat('data_mat/pressure.mat')['pressure'].reshape(nR,nx,ny,nt)
+    saturation = loadmat('data_mat/saturation.mat')['saturation'].reshape(nR,nx,ny,nt)
+    well_locs  = loadmat('data_mat/well_locations.mat')['well_locations']
+    well_locs_mask = np.zeros((nR,nx,ny))
+    for i in range(nR):
+        well_locs_mask[i, well_locs[i][0], well_locs[i][1]] = 1  
+    if save:
+        np.save('data_npy/timesteps.npy', timesteps); np.save('data_npy/bhp.npy', bhp)
+        np.save('data_npy/well_locs.npy', well_locs); np.save('data_npy/well_locs_mask.npy', well_locs_mask)
+        np.save('data_npy/poro.npy', poro);           np.save('data_npy/perm.npy', perm)
+        np.save('data_npy/pressure.npy', pressure);   np.save('data_npy/saturation.npy', saturation)
+    if verbose:
+        print('Log-Perm: {}'.format(logperm.shape))
+        print('Permeability: {} | Porosity: {}'.format(perm.shape, poro.shape))
+        print('Pressure: {} | Saturation: {}'.format(pressure.shape, saturation.shape))
+        print('Timesteps: {} | BHP: {}'.format(timesteps.shape, bhp.shape))
+        print('Well Locations: {} | Well Locations MASK: {}'.format(well_locs.shape, well_locs_mask.shape))
+    return logperm, perm, poro, timesteps, bhp, pressure, saturation, well_locs, well_locs_mask
+
+#################### PLOTS ####################
 def plot_well_locs(wdata, kdata, figsize=(4,4), color='k', cmap='jet', title='Random Well Locations', xlab='X index', ylab='Y index', cbar_label='$log(k_x)$ [log-mD]'):
     plt.figure(figsize=figsize)
     plt.scatter(wdata[:,0], wdata[:,1], c=color)
@@ -46,29 +83,4 @@ def plot_dynamic(ddata, sdata, well_loc, nrows, multiplier=1, cmap='jet', figsiz
             axs[i,j+1].set(xticks=[], yticks=[])
         for j in range(len(j_timesteps)+1):
             axs[i,j].scatter(well_loc[k][0], well_loc[k][1], c='k', marker='o')
-        k += multiplier  
-
-def load_data(nx=32, ny=32, nt=60, nR=100, save=False, verbose=True):
-    logperm    = np.array(pd.read_csv('simulations/perm_realization.csv')).reshape(nx,ny)
-    perm       = loadmat('data_mat/permeability.mat')['permeability'].reshape(nx,ny,3)
-    poro       = loadmat('data_mat/porosity.mat')['poro'].reshape(nx,ny)
-    timesteps  = loadmat('data_mat/time_yr.mat')['cum_time']
-    bhp        = loadmat('data_mat/bhp.mat')['bhp']
-    pressure   = loadmat('data_mat/pressure.mat')['pressure'].reshape(nR,nx,ny,nt)
-    saturation = loadmat('data_mat/saturation.mat')['saturation'].reshape(nR,nx,ny,nt)
-    well_locs  = loadmat('data_mat/well_locations.mat')['well_locations']
-    well_locs_mask = np.zeros((nR,nx,ny))
-    for i in range(nR):
-        well_locs_mask[i, well_locs[i][0], well_locs[i][1]] = 1  
-    if save:
-        np.save('data_npy/timesteps.npy', timesteps); np.save('data_npy/bhp.npy', bhp)
-        np.save('data_npy/well_locs.npy', well_locs); np.save('data_npy/well_locs_mask.npy', well_locs_mask)
-        np.save('data_npy/poro.npy', poro);           np.save('data_npy/perm.npy', perm)
-        np.save('data_npy/pressure.npy', pressure);   np.save('data_npy/saturation.npy', saturation)
-    if verbose:
-        print('Log-Perm: {}'.format(logperm.shape))
-        print('Permeability: {} | Porosity: {}'.format(perm.shape, poro.shape))
-        print('Pressure: {} | Saturation: {}'.format(pressure.shape, saturation.shape))
-        print('Timesteps: {} | BHP: {}'.format(timesteps.shape, bhp.shape))
-        print('Well Locations: {} | Well Locations MASK: {}'.format(well_locs.shape, well_locs_mask.shape))
-    return logperm, perm, poro, timesteps, bhp, pressure, saturation, well_locs, well_locs_mask
+        k += multiplier
