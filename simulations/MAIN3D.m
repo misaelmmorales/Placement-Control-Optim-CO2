@@ -15,27 +15,30 @@ mrstModule add SPE10 coarsegrid upscaling co2lab mrst-gui
 mrstModule add ad-core ad-props ad-blackoil
 
 %% Make Grid
-dims = 32; nz=5;
-dx=1000*meter; dy=1000*meter; dz=500*meter;
+dims = 32; nz=8;
+dx=1000*meter; dy=1000*meter; dz=nz*50*meter;
 
 G = cartGrid([dims, dims, nz], [dx, dy, dz]);
 G = computeGeometry(G);
 
-G10 = computeGeometry(cartGrid([60,220,5], [dx dy dz]));
+G10 = computeGeometry(cartGrid([60,220,nz], [dx dy dz]));
 
 %% Make rock
-[poro1, perm1] = make_rock_layers(1,2);
+%usdw zone
+[poro1, perm1] = make_rock_layers(1,3);
+%caprock zone
 poro2 = gaussianField(G10.cartDims, [0.05,0.08], [11,5,1], 2.5);
 perm2 = reshape(logNormLayers(G10.cartDims, [0.05, 0.05])*milli*darcy, G10.cartDims);
-[poro3, perm3] = make_rock_layers(30,31);
+%resservoir zone
+[poro3, perm3] = make_rock_layers(30,32);
 
-poro10 = cat(3, poro1, poro2(:,:,1), poro3);
-permx10 = cat(3, perm1, perm2(:,:,1), perm3);
-
+%combine and reshape
+poro10 = cat(3, poro1, poro2(:,:,1:2), poro3);
+permx10 = cat(3, perm1, perm2(:,:,1:2), perm3);
 [poro, permx] = deal(zeros(dims,dims,nz));
 for i=1:nz
-    poro(:,:,i) = imresize(poro10(:,:,i), [dims,dims], 'nearest');
-    permx(:,:,i) = imresize(permx10(:,:,i), [dims,dims], 'nearest'); %antialiasing=false
+    poro(:,:,i) = imresize(poro10(:,:,i), [dims,dims], 'nearest', 'antialiasing', true);
+    permx(:,:,i) = imresize(permx10(:,:,i), [dims,dims], 'nearest', 'antialiasing', true); %antialiasing=false
 end
 poro = reshape(poro, [], 1)+0.05;
 permx = reshape(permx, [], 1);
@@ -99,42 +102,45 @@ bc = addBC(bc, bc_face_ix, 'pressure', p_face_pressure, 'sat', [1,0]);
 
 %% Define Timesteps
 inj_time = 5*year;
-inj_timesteps = rampupTimesteps(inj_time, year/12, 10);
+mon_time = 45*year;
 
-mon_time = 5*year;
+inj_timesteps = rampupTimesteps(inj_time, year, 10);
 mon_timesteps = rampupTimesteps(mon_time, year, 0);
 
-total_time = inj_time + mon_time;
 cum_time = convertTo(cumsum([inj_timesteps; mon_timesteps]), year);
-
-irate = 0.25*sum(poreVolume(G, rock))/(mon_time);
+irate    = (1/3)*sum(poreVolume(G, rock))/(inj_time);
 
 %% Run Simulations
-N_realization = 50;
-
-modrock = cell(N_realization, 1);
-results  = cell(N_realization, 1);
-inj_locations = cell(N_realization,1);
-mon_locations = cell(N_realization,1);
+N_realization = 4;
 
 parfor i=1:N_realization
     loc_inj = randi([4,28], [1,2]);
     num_moni = randi(7);
     loc_moni = randi([2,30], [num_moni,2]);
 
-    newrock = gen_monitorwells(G, rock, num_moni, loc_moni);
-    W = gen_wells_3d(G, newrock, loc_inj, nz, irate);
-    [schedule, dT1, dT2] = gen_schedule_3d(W, bc, inj_timesteps, mon_timesteps);
+    [newrock, rand_perm]     = gen_monitorwells(G, rock, num_moni, loc_moni);
+    W                        = gen_wells_3d(G, newrock, loc_inj, nz-2:nz, irate);
+    [schedule, ~, ~]         = gen_schedule_3d(W, bc, inj_timesteps, mon_timesteps);
     [model, wellSol, states] = gen_simulation(G, newrock, fluid, initState, schedule);
 
     inj_locations{i} = loc_inj;
     mon_locations{i} = loc_moni;
 
     results{i} = states;
+    wells{i} = W;
+
     modrock{i} = newrock;
+    randperm{i} = convertTo(rand_perm, milli*darcy);
 end
-% max(max(reshape(results{20,1}{end,1}.s(:,2), [32,32,5])))
-% plot(reshape(max(max(reshape(results{44,1}{end,1}.s(:,2), [32,32,5]))), [], 1))
+
+for i=1:length(mon_locations)
+    for k=1:length(mon_locations{i})
+        wells{i} = verticalWell(wells{i}, G, modrock{i},...
+                                mon_locations{i}(k,1), mon_locations{i}(k,2), [], ...
+                                'name', ['Monitor ', int2str(k)], ...
+                                'comp_i', [0.5,0.5]);
+    end
+end
 
 
 %% Collect Results
@@ -155,6 +161,11 @@ end
 %}
 
 %% Plots
+for p=1:N_realization
+    figure
+    plotToolbar(G, results{p}); colormap jet; colorbar; view(-70,80)
+    plotWell(G, wells{p}, 'color','r')
+end
 
 %{
 figure
