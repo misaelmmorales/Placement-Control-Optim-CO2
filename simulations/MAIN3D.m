@@ -37,8 +37,8 @@ poro10 = cat(3, poro1, poro2(:,:,1:2), poro3);
 permx10 = cat(3, perm1, perm2(:,:,1:2), perm3);
 [poro, permx] = deal(zeros(dims,dims,nz));
 for i=1:nz
-    poro(:,:,i) = imresize(poro10(:,:,i), [dims,dims], 'nearest', 'antialiasing', true);
-    permx(:,:,i) = imresize(permx10(:,:,i), [dims,dims], 'nearest', 'antialiasing', true); %antialiasing=false
+    poro(:,:,i) = imresize(poro10(:,:,i), [dims,dims], 'bicubic');%, 'antialiasing', true);
+    permx(:,:,i) = imresize(permx10(:,:,i), [dims,dims], 'bicubic');%, 'antialiasing', true);
 end
 poro = reshape(poro, [], 1)+0.05;
 permx = reshape(permx, [], 1);
@@ -55,7 +55,7 @@ clear permeability permx perm poro
 gravity on;  g = gravity;
 rhow = 1000; % density of brine corresponding to 94 degrees C and 300 bar
 %initState.pressure = G.cells.centroids(:,3) * 400*psia; %G.cells.centroids=3
-P0 = 4000*psia; 
+P0 = 4000*psia;
 initState.pressure = repmat(P0, dims*dims*nz, 1);
 initState.s = repmat([1, 0], G.cells.num, 1);
 initState.sGmax = initState.s(:,2);
@@ -89,7 +89,7 @@ fluid.krG = @(s) fluid.krG(max((s-src)./(1-src), 0));
 % Add capillary pressure
 pe = 5 * kilo * Pascal;
 pcWG = @(sw) pe * sw.^(-1/2);
-fluid.pcWG = @(sg) pcWG(max((1-sg-srw)./(1-srw), 1e-5)); 
+fluid.pcWG = @(sg) pcWG(max((1-sg-srw)./(1-srw), 1e-5));
 
 %% Make Boundary Conditions
 bc = [];
