@@ -1,0 +1,67 @@
+import sys,os
+from matk import matk, pest_io 
+from subprocess import call
+from itertools import product
+import numpy as np
+
+# Model function
+def fehm(p):
+    # Create perm macro
+    pb = np.genfromtxt("../perm_base.txt")
+    pbmods = pb*p['kmult']
+    with open('perm_base.dat','w') as fh:
+        fh.write('perm\n')
+        fh.write('    1    0	0	1e-16	1e-16	1e-16\n')
+        fh.write("    %d %d %d %e %e %e\n"%(-12, 0, 0, 1e-19, 1e-19, 1e-19))
+        fh.write("    %d %d %d %e %e %e\n"%(-13, 0, 0, 1e-13, 1e-13, 1e-13))
+        fh.write("    %d %d %d %e %e %e\n"%(26531, 49940, 2601, p['perm4'], p['perm4'], p['perm4']))
+        fh.write("    %d %d %d %e %e %e\n"%(26551, 49960, 2601, p['perm5'], p['perm5'], p['perm5']))
+        fh.write("    %d %d %d %e %e %e\n"%(27561, 50970, 2601, p['perm6'], p['perm6'], p['perm6']))
+        for i,pbmod in enumerate(pbmods):
+            fh.write("    %d %d %d %e %e %e\n"%(i+1, i+1, 1, pbmod[0], pbmod[1], pbmod[2]))
+        fh.write("\n")
+    # Create simulator input file
+    #if not os.path.isfile('fehm.files'):
+    #    os.symlink('../fehmn.files','fehmn.files')
+    pest_io.tpl_write(p, '../run.tpl', 'run.dat')
+    # Second way to generate heterogeneous perm realizations, but prefer first method above 
+    #pest_io.tpl_write(p, '../perm_base.tpl', 'perm_base.dat')
+    # Call simulator
+    ierr = call('xfehm ../fehmn.files', shell=True)
+
+p = matk(model=fehm)
+#p.add_par('perm1',min=1e-14,max=1e-12)
+#p.add_par('perm2',min=1e-19,max=1e-16)
+#p.add_par('perm3',min=1e-14,max=1e-12)
+p.add_par('perm4',min=1e-19,max=1e-15)
+p.add_par('perm5',min=1e-19,max=1e-15)
+p.add_par('perm6',min=1e-19,max=1e-15)
+#p.add_par('leak1',min=26531,max=28091)
+#p.add_par('q_co2',min=3.17,max=15.85)
+p.add_par('kmult',min=0.5, max=2.0)
+## Create your sample from scratch
+#p1 = [1e-13]
+#p2 = [1e-19]
+#p3 = [1e-13]
+#l1=[]
+#for i in range(1,5):
+#    for j in range(1,5):
+#        leak = 2601*10+51*10*i+10*(j-1)+11
+#        l1.append(leak)
+#q_co2 = [3.17,15.85]
+#kmult = [0.5,2]
+#q_co2 = np.arange(0.005,0.01, 10)
+
+#s = p.create_sampleset(list(product(*[p1,p2,p3,l1,q_co2,kmult])))
+
+
+# Or use auto parstudy method
+#s = p.parstudy(nvals=[2,1,2,2])
+
+#Create LHS sample
+s = p.lhs(siz=500, seed=1000)
+
+s.savetxt('sample.txt')
+
+# Run model with parameter samples
+s.run(cpus=8, workdir_base='workdir', outfile='results.dat', logfile='log.dat',verbose=False,reuse_dirs=True)

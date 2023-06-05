@@ -1,0 +1,13 @@
+input: run.dat
+grida: /scratch/er/bailianchen/azmi/Example_3D/mesh/mesh.fehmn
+rsto: run.rsto
+outp: run.out
+check: run.chk
+rsti: /scratch/er/bailianchen/azmi/Example_3D/init1/run.rsto
+co2in: /scratch/er/dharp/source/fehm/fehm-open/fehmpytests/co2_files/co2_interp_table.txt
+stor: /scratch/er/bailianchen/azmi/Example_3D/mesh/mesh.stor
+root:run
+
+none
+
+#999
