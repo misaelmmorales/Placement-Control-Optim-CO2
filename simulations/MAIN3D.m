@@ -1,6 +1,6 @@
 %% Main variables
 clear; close all; clc
-%set(0,'DefaultFigureWindowStyle','docked')
+set(0,'DefaultFigureWindowStyle','docked')
 
 %{
 current_dir = pwd;
