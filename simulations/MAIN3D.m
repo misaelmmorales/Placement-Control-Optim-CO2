@@ -16,7 +16,7 @@ mrstModule add ad-core ad-props ad-blackoil
 
 %% Make Grid
 dims = 32; nz=8;
-dx=1000*meter; dy=1000*meter; dz=nz*50*meter;
+dx=1000*meter; dy=1000*meter; dz=200*meter;
 
 G = cartGrid([dims, dims, nz], [dx, dy, dz]);
 G = computeGeometry(G);
@@ -111,7 +111,7 @@ cum_time = convertTo(cumsum([inj_timesteps; mon_timesteps]), year);
 irate    = (1/3)*sum(poreVolume(G, rock))/(inj_time);
 
 %% Run Simulations
-N_realization = 4;
+N_realization = 5;
 
 parfor i=1:N_realization
     loc_inj = randi([4,28], [1,2]);
