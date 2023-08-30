@@ -1,5 +1,5 @@
 # Placement-Control-Optim-CO2
-Well placement optimization for CO2 injection
+Well placement and control optimization for CO2 injection
 
 <p align="center">
   <img src="https://github.com/misaelmmorales/CO2-Placement-Optim/blob/main/figures/logperm.png" width="250"/>
