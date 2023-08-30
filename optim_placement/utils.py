@@ -3,14 +3,18 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from scipy.io import loadmat
 import tensorflow as tf
+from tensorflow.python.client import device_lib
 
 def check_tensorflow_gpu():
     sys_info = tf.sysconfig.get_build_info()
+    cuda_version, cudnn_version = sys_info['cuda_version'], sys_info['cudnn_version']
+    num_gpu_avail = len(tf.config.experimental.list_physical_devices('GPU'))
+    gpu_name = device_lib.list_local_devices()[1].physical_device_desc[17:40]
+    print('... Checking Tensorflow Version ...')
     print('Tensorflow built with CUDA?',  tf.test.is_built_with_cuda())
-    print('Tensorflow version:', tf.__version__)
-    print('# GPU available:', len(tf.config.experimental.list_physical_devices('GPU')))
-    print("CUDA: {} | cuDNN: {}".format(sys_info["cuda_version"], sys_info["cudnn_version"]))
-    print(tf.config.list_physical_devices())
+    print("TF: {} | CUDA: {} | cuDNN: {}".format(tf.__version__, cuda_version, cudnn_version))
+    print('# GPU available: {} ({})'.format(num_gpu_avail, gpu_name))
+    #print(tf.config.list_physical_devices())
     return None
 
 #################### DATALOADER ####################
