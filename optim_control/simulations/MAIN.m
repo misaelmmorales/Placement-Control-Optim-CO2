@@ -8,7 +8,7 @@ mrstModule add ad-core ad-props ad-blackoil
 
 %% Make Grid
 dims = 64;
-nx=dims; ny=dims; nz=1; 
+nx=dims; ny=dims; nz=8; 
 dx=1000*meter; dy=1000*meter; dz=100*meter;
 
 % Make cartesian grid
@@ -16,23 +16,18 @@ G = cartGrid([nx ny nz], [dx dy dz]);
 G = computeGeometry(G);
 
 %% Make Rock
-logperm = readmatrix('perm_realization.csv');
-random = 0.2*randn([dims*dims,1]);
+K    = logNormLayers(G.cartDims, repmat([400, 0.1, 20], [1, 2]));
+phi  = gaussianField(G.cartDims, [0.2, 0.4]);
+ntg  = rand([G.cells.num, 1]);
+rock = makeRock(G, convertFrom(K(:), milli*darcy), phi(:), 'ntg', ntg);
 
-poro = 10.^((logperm-7)/10);
-permx = (10.^(0.25+logperm+random))*milli*darcy;
-permy = permx;
-permz = 0.1*permx;
-perm = [permx, permy, permz];
-rock = makeRock(G, perm, poro);
-permeability = convertTo(perm, milli*darcy);
 
 %% Make Initial State
 gravity on;  g = gravity;
 rhow = 1000; % density of brine corresponding to 94 degrees C and 300 bar
 %initState.pressure = G.cells.centroids(:,3) * 400*psia; %G.cells.centroids=3
 P0 = 4000*psia; 
-initState.pressure = repmat(P0, 1024,1);
+initState.pressure = repmat(P0, G.cells.num, 1);
 initState.s = repmat([1, 0], G.cells.num, 1);
 initState.sGmax = initState.s(:,2);
 
