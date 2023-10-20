@@ -1,3 +1,5 @@
+clear;clc;close all
+
 mrstModule add SPE10 coarsegrid upscaling co2lab mrst-gui
 mrstModule add ad-core ad-props ad-blackoil
 
@@ -70,13 +72,12 @@ p_face_pressure = initState.pressure(bc_cell_ix);
 bc = addBC(bc, bc_face_ix, 'pressure', p_face_pressure, 'sat', [1,0]);
 
 %% Define Timesteps
-timestep1 = rampupTimesteps(5*year, year/12, 10);
+timestep1 = rampupTimesteps(80*year, 2*year, 0);
 total_time = timestep1;
 
 %% Simulation
 
-nwells = randi([1,3], 1);
-R_inj = (1/nwells) * 0.5 * 556.2 * 1000 * meter^3 / year;
+R_inj = 5 * 556.2 * 1000 * meter^3 / year;
 W = [];
 W = verticalWell(W, G, rock, 20, 60, 10:20, ...
             'Type', 'rate', 'Val', R_inj, 'InnerProduct', 'ip_tpf', ...
@@ -87,6 +88,7 @@ schedule.step.val = timestep1;
 schedule.step.control = ones(numel(timestep1),1);
 
 model  = TwoPhaseWaterGasModel(G, rock, fluid);
-[wellSol, states] = simulateScheduleAD(initState, model, schedule);
+[wellSol, states] = simulateScheduleAD(initState, model, schedule, ...
+                                  'NonLinearSolver', NonLinearSolver());
 
-
+%% END
