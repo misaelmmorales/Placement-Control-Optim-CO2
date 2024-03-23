@@ -9,7 +9,7 @@ startup;
 chdir(proj_dir);
 
 % Import MRST module
-mrstModule add spe10 co2lab ad-core ad-props ad-blackoil mrst-gui
+mrstModule add spe10 coarsegrid co2lab ad-core ad-props ad-blackoil mrst-gui
 
 %% Make Johansen Grid
 
