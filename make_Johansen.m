@@ -1,4 +1,4 @@
-function [G, rock, bcIx, Gt, transMult, rock2D, bcIxVE, grdecl] = make_VEJohansen(i)
+function [G, rock, bcIx, Gt, transMult, rock2D, bcIxVE, grdecl] = make_Johansen(i)
 %Make a VE model based upon a data set of the Johansen formation
 %   G      - Data structure for 3D grid
 %   Gt     - Data structure for topsurface grid
@@ -10,8 +10,7 @@ sector = fullfile(mrstPath('co2lab'), 'data', 'johansen', 'NPD5');
 grdecl = readGRDECL([sector '.grdecl']);
 
 % Load permeability and porosity
-fname = sprintf('data_100_100_11/rock/rock_%d.mat', i);
-r = load(fname);
+r = load(sprintf('data_100_100_11/rock/rock_%d.mat', i));
 p = r.poro(:);
 K = 10.^r.perm(:);
 
