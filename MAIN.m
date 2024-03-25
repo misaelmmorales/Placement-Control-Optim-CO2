@@ -41,10 +41,11 @@ W = make_wells(W, G, rock, well_locs, inj_rate, max_bhp);
 %% Initial State
 [Gt, G, transMult] = topSurfaceGrid(G);
 rock2D             = averageRock(rock, Gt);
-W2D                = convertwellsVE(W, G, Gt, rock2D);
 initState.pressure = rhow * g(3) * Gt.cells.z;
 initState.s        = repmat([1, 0], Gt.cells.num, 1);
 initState.sGmax    = initState.s(:,2);
+
+W2D                = convertwellsVE(W, G, Gt, rock2D);
 
 %% VE Fluid
 invPc3D = @(pc) (1-srw) .* (pe./max(pc, pe)).^2 + srw;
