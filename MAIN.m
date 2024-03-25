@@ -8,7 +8,7 @@ set(0,'DefaultFigureWindowStyle','docked')
 mrstModule add ad-core ad-props co2lab coarsegrid mrst-gui
 
 %% Initialize Grid, Rock, Fluid, Initial State, Boundary Conditions
-[G, rock, bcIx, ~, ~, ~, ~, grdecl] = make_Johansen(99);
+[G, rock, bcIx, ~, ~, ~, bcIxVE, grdecl] = make_Johansen(41);
 
 gravity reset on;
 g       = gravity;
@@ -35,9 +35,9 @@ fluid = initSimpleADIFluid('phases', 'WG'           , ...
                            'n'   , [2 2]);
 
 % relative permeability and capillary pressure
-fluid.krW = @(s) fluid.krW(max((s-srw)./(1-srw), 0));
-fluid.krG = @(s) fluid.krG(max((s-src)./(1-src), 0));
-pcWG = @(sw) pe * sw.^(-1/2);
+fluid.krW  = @(s) fluid.krW(max((s-srw)./(1-srw), 0));
+fluid.krG  = @(s) fluid.krG(max((s-src)./(1-src), 0));
+pcWG       = @(sw) pe * sw.^(-1/2);
 fluid.pcWG = @(sg) pcWG(max((1-sg-srw)./(1-srw), 1e-5));
 
 % initial state
@@ -52,12 +52,12 @@ bc   = addBC(bc, bcIx, 'pressure', p_bc, 'sat', [1,0]);
 
 %% Well(s)
 inj_rate  = 3 * mega * 1e3 / year / rhoc;
-max_bhp   = 6000 * psia;
+max_bhp   = 10000 * psia;
 
 num_wells = randi([1,3]);
 
 increment = 8072;
-actnum = reshape(grdecl.ACTNUM, [100,100,11]);
+actnum = reshape(grdecl.ACTNUM, G.cartDims);
 actnum_l1 = actnum(:,:,1);
 well_loc_l1 = randsample(find(actnum_l1(:)), num_wells);
 
@@ -68,6 +68,7 @@ end
 
 W   = []; 
 W   = make_wells(W, G, rock, well_locs, inj_rate, []);
+gcf; hold on; plotWell(G, W)
 
 %% Schedule
 % total injection of 30 Mt CO2 over 10 years
@@ -78,10 +79,10 @@ for i=1:20
 end
 schedule.control(21) = struct('W', W, 'bc', bc);
 
-min_rate  = 0.5 * mega * 1e3 / year / rhoc;
-well_rate = 5.0*rand(1,20) * mega * 1e3 / year / rhoc;
+min_rate  = 0.5             * mega * 1e3 / year / rhoc;
+well_rate = 10 * rand(1,20) * mega * 1e3 / year / rhoc;
 well_rate(well_rate<min_rate) = 0;
-well_rate = well_rate * 0.5* (30/(rhoc*sum(well_rate*year/2)/mega/1e3));
+well_rate = well_rate * (50 / (rhoc*sum(well_rate*year/2)/mega/1e3));
 
 for i=1:num_wells
     schedule.control(21).W(i).val = 0;
@@ -90,21 +91,89 @@ for i=1:num_wells
     end
 end
 
-schedule.step.val     = [repmat(year/2,20,1); repmat(10*year,50,1)];
-schedule.step.control = [linspace(1,20,20)';  ones(50,1)*21];
+schedule.step.val     = [repmat(year/2,20,1); repmat(50*year,10,1)];
+schedule.step.control = [linspace(1,20,20)';  ones(10,1)*21];
 
 %% Run simulation
 model             = TwoPhaseWaterGasModel(G, rock, fluid, 0, 0);
 [wellSol, states] = simulateScheduleAD(initState, model, schedule);
 states            = [{initState} states(:)'];
 
-%% Trap analysis
-ta      = trapAnalysis(Gt, false);
-reports = makeReports(Gt, states, model.rock, model.fluid, schedule, [srw, src], ta, []);
-
 %% Plots
 figure; plotCellData(G, rock.poro); plotWell(G,W); view(-60,30); colormap jet; colorbar
-plot_simulation_animation
-plot_trapping_inventory
+figure; plotToolbar(G, states, 'edgecolor','k'); plotWell(G,W); view(-60,30); colormap jet; colorbar
+
+
+%% Vertical Equilibrium simulation
+[Gt, ~, transMult] = topSurfaceGrid(G);
+rock2D = averageRock(rock, Gt);
+W2D = convertwellsVE(W, G, Gt, rock2D);
+VE_initState.pressure = rhow*g(3)*Gt.cells.z;
+VE_initState.s        = repmat([1,0], Gt.cells.num, 1);
+VE_initState.sGmax    = VE_initState.s(:,2);
+
+invPc3D  = @(pc) (1-srw) .* (pe./max(pc,pe)).^2 + srw; 
+kr3D     = @(s) max((s-src)./(1-src), 0).^2;
+VE_fluid = makeVEFluid(Gt, rock2D, 'P-scaled table'     , ...
+                       'co2_mu_ref'  , muco2            , ...
+                       'wat_mu_ref'  , muw              , ...
+                       'co2_rho_ref' , rhoc             , ...
+                       'wat_rho_ref' , rhow             , ...
+                       'co2_rho_pvt' , [c_co2, p_ref]   , ...
+                       'wat_rho_pvt' , [c_water, p_ref] , ...
+                       'residual'    , [srw, src]       , ...
+                       'pvMult_p_ref', p_ref            , ...
+                       'pvMult_fac'  , c_rock           , ...
+                       'invPc3D'     , invPc3D          , ...
+                       'kr3D'        , kr3D             , ...
+                       'transMult'   , transMult);
+
+bc2D     = addBC([], bcIxVE, 'pressure', Gt.faces.z(bcIxVE) * rhow * g(3));
+bc2D.sat = repmat([1,0], numel(bcIxVE), 1);
+
+for i=1:20
+    VE_schedule.control(i) = struct('W', W2D, 'bc', bc2D);
+end
+VE_schedule.control(21) = struct('W', W2D, 'bc', bc2D);
+
+for i=1:num_wells
+    VE_schedule.control(21).W(i).val = 0;
+    for k=1:20
+        VE_schedule.control(k).W(i).val = well_rate(k);
+    end
+end
+
+VE_schedule.step.val     = [repmat(year/2,20,1); repmat(50*year,10,1)];
+VE_schedule.step.control = [linspace(1,20,20)';  ones(10,1)*21];
+
+VE_model = CO2VEBlackOilTypeModel(Gt, rock2D, VE_fluid);
+[VE_wellSol, VE_states] = simulateScheduleAD(VE_initState, VE_model, VE_schedule);
+VE_states = [{VE_initState} VE_states(:)'];
+
+figure
+oG = generateCoarseGrid(Gt.parent, ones(Gt.parent.cells.num,1));
+plotFaces(oG, 1:oG.faces.num,'FaceColor','none');
+plotWell(Gt.parent, W,'FontSize',10);
+view(-63, 50); axis tight; colorbar, clim([0 1-srw]); colormap(parula.^2);
+hs     = [];
+time   = cumsum([0; VE_schedule.step.val])/year;
+period = [1; VE_schedule.step.control];
+for i=1:numel(VE_states)
+    delete(hs)
+    [h, h_max] = upscaledSat2height(VE_states{i}.s(:,2), VE_states{i}.sGmax, Gt, ...
+                                    'pcWG', VE_fluid.pcWG, ...
+                                    'rhoW', VE_fluid.rhoW, ...
+                                    'rhoG', VE_fluid.rhoG, ...
+                                    'p', VE_states{end}.pressure);
+    sat = height2Sat(struct('h', h, 'h_max', h_max), Gt, VE_fluid);
+    title(sprintf('Time: %4d yrs', time(i)));
+    hs = plotCellData(Gt.parent, sat); drawnow
+end
+
+ta = trapAnalysis(Gt, false);
+reports = makeReports(Gt, VE_states, VE_model.rock, VE_model.fluid, VE_schedule, ...
+                        [srw, src], ta, []);
+h1 = figure; plot(1); ax = get(h1, 'currentaxes');
+plotTrappingDistribution(ax, reports, 'legend_location', 'northwest');
 
 %% END
