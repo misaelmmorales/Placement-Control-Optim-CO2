@@ -26,8 +26,8 @@ muco2   = co2.mu(p_ref, t_ref) * Pascal * second; % co2 viscosity
 
 %% Initialize Grid
 [G, rock, bcIx, ~, ~, bcIxVE] = makeJohansenVEgrid();
-GG = G; GG.nodes.coords(:,3)  = GG.nodes.coords(:,3) + 100;
-[Gt, ~, ~]                    = topSurfaceGrid(G);
+GG = G; GG.nodes.coords(:,3) = GG.nodes.coords(:,3) + 100;
+[Gt, ~, ~] = topSurfaceGrid(G);
 
 %% Well(s)
 inj_rate  = 3 * mega * 1e3 / year / co2_rho;
@@ -65,7 +65,7 @@ fluid   = makeVEFluid(Gt, rock, 'P-scaled table'             , ...
 
 %% Schedule
 % total injection of 30 Mt CO2 over 10 years
-% change controls every 6 months (20 control steps)
+% change controls every 6 months (20 control steps
 
 p_bc     = Gt.faces.z(bcIxVE) * rhow * g(3);
 bc2D     = addBC([], bcIxVE, 'pressure', p_bc); 
@@ -76,12 +76,13 @@ for i=1:20
 end
 schedule.control(21) = struct('W', W2D, 'bc', bc2D);
 
-inj_rate  = 3.0 * mega * 1e3 / year / co2_rho;
+inj_rate  = 3 * mega * 1e3 / year / co2_rho;
 min_rate  = 0.5 * mega * 1e3 / year / co2_rho;
 
-well_rate = 6.0*rand(1,20) * mega * 1e3 / year / co2_rho;
+well_rate = 6*rand(1,20) * mega * 1e3 / year / co2_rho;
 well_rate(well_rate<min_rate) = 0;
 well_rate = well_rate * (30/(co2_rho*sum(well_rate*year/2)/mega/1e3));
+
 
 for i=1:num_wells
     schedule.control(2).W(i).val = 0;
@@ -90,16 +91,16 @@ for i=1:num_wells
     end
 end
 
-schedule.step.val     = [repmat(year/2,20,1); repmat(10*year,50,1)];
-schedule.step.control = [linspace(1,20,20)';  ones(50,1)*21];
+schedule.step.val     = [repmat(year/2, 20, 1); repmat(10*year, 50, 1)];
+schedule.step.control = [linspace(1,20,20)';    ones(50,1)*21];
 
 %% Run simulation
-model             = CO2VEBlackOilTypeModel(Gt, rock2D, fluid);
+model = CO2VEBlackOilTypeModel(Gt, rock2D, fluid);
 [wellSol, states] = simulateScheduleAD(initState, model, schedule);
-states            = [{initState} states(:)'];
+states = [{initState} states(:)'];
 
 %% Trap analysis
-ta      = trapAnalysis(Gt, false);
+ta = trapAnalysis(Gt, false);
 reports = makeReports(Gt, states, model.rock, model.fluid, schedule, [srw, src], ta, []);
 
 %% END
