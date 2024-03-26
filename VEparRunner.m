@@ -8,11 +8,18 @@ set(0,'DefaultFigureWindowStyle','docked')
 mrstModule add ad-core ad-props co2lab coarsegrid mrst-gui
 
 %% Grid, Rock, BCs
-
-parfor i=1:10
+n_realizations = 1272;
+parfor i=1:n_realizations
     [VE_states, reports] = VEsimulation(i-1)
-    parsave(fprintf('data_100_100_11/states/states_%d', i-1), 'VE_states')
-    parsave(fprintf('data_100_100_11/reports/reports_%d', i-1), 'reports')
+
+    sname = sprintf('data_100_100_11/states/states_%d', i-1);
+    parsave(sname, VE_states)
+    
+    rname = sprintf('data_100_100_11/reports/reports_%d', i-1);
+    parsave(rname, reports)
+
+    fprintf('Simulation %i done\n', i)
+
 end
 
 %% END

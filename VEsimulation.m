@@ -110,9 +110,9 @@ function [VE_states, reports] = VEsimulation(i)
     VE_schedule.step.control = [linspace(1,20,20)';  ones(10,1)*21];
 
     %% Simulation
-    VE_model                = CO2VEBlackOilTypeModel(Gt, rock2D, VE_fluid);
+    VE_model       = CO2VEBlackOilTypeModel(Gt, rock2D, VE_fluid);
     [~, VE_states] = simulateScheduleAD(VE_initState, VE_model, VE_schedule);
-    VE_states               = [{VE_initState} VE_states(:)'];
+    VE_states      = [{VE_initState} VE_states(:)'];
 
     %% Trap Analysis
     ta = trapAnalysis(Gt, false);
