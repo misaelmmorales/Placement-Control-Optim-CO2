@@ -67,8 +67,8 @@ muw     = 8e-4 * Pascal * second;                 % brine viscosity
 muco2   = co2.mu(p_ref, t_ref) * Pascal * second; % co2 viscosity
 
 %% Well(s)
-inj_rate  = 3 * mega * 1e3 / year / rhoc;
-max_bhp   = []; %10000 * psia;
+inj_rate  = 5 * mega * 1e3 / year / rhoc;
+max_bhp   = 5000*psia; %[]; %10000 * psia;
 
 num_wells = randi([1,3]);
 increment = 8072;
