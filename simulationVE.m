@@ -1,8 +1,8 @@
-function [VE_states, reports] = simulationVE(i)
+function [VE_states, ta_reports] = simulationVE(realization)
     %% Grid, Rock, and BCs
     grdecl = readGRDECL([fullfile(mrstPath('co2lab'),'data','johansen','NPD5'),'.grdecl']);
 
-    r = load(sprintf('data_100_100_11/rock/rock_%d.mat', i));
+    r = load(sprintf('data_100_100_11/rock/rock_%d.mat', realization));
     p = r.poro(:);
     K = 10.^r.perm(:);  
     
@@ -16,13 +16,13 @@ function [VE_states, reports] = simulationVE(i)
     rock.poro = p(G.cells.indexMap);
     rock2D    = averageRock(rock, Gt);
     clear p K;
-
+    
     % boundary 2D
     nx = Gt.cartDims(1); ny=Gt.cartDims(2);
-    ix1    = searchForBoundaryFaces(Gt, 'BACK',  1:nx-6, 1:4, []);
-    ix2    = searchForBoundaryFaces(Gt, 'LEFT',  1:20, 1:ny,  []);
-    ix3    = searchForBoundaryFaces(Gt, 'RIGHT', 1:nx, ny-10:ny, []);
-    ix4    = searchForBoundaryFaces(Gt, 'FRONT', 1:nx/2-8, ny/2:ny, []);
+    ix1 = searchForBoundaryFaces(Gt, 'BACK',  1:nx-6, 1:4, []);
+    ix2 = searchForBoundaryFaces(Gt, 'LEFT',  1:20, 1:ny,  []);
+    ix3 = searchForBoundaryFaces(Gt, 'RIGHT', 1:nx, ny-10:ny, []);
+    ix4 = searchForBoundaryFaces(Gt, 'FRONT', 1:nx/2-8, ny/2:ny, []);
     bcIxVE = [ix1; ix2; ix3; ix4];
     clear ix1 ix2 ix3 ix4 nx ny nz
 
@@ -43,18 +43,22 @@ function [VE_states, reports] = simulationVE(i)
     muw     = 8e-4 * Pascal * second;                 % brine viscosity
     muco2   = co2.mu(p_ref, t_ref) * Pascal * second; % co2 viscosity
 
-    %% Wells
-    inj_rate    = 3 * mega * 1e3 / year / rhoc;
-    max_bhp     = []; %10000 * psia;
-    num_wells   = randi([1,3]);
-    increment   = 8072;
+    %% Wells(s)
+    inj_rate  = 5 * mega * 1e3 / year / rhoc;
+    max_bhp   = 5000*psia; %[]; %10000 * psia;
+    
+    num_wells = randi([1,3]);
+    increment = 8072;
+    
     actnum      = reshape(grdecl.ACTNUM, G.cartDims);
     actnum_l1   = actnum(:,:,1);
     well_loc_l1 = randsample(find(actnum_l1(:)), num_wells);
-    well_locs   = zeros(5, num_wells);
+    
+    well_locs = zeros(5, num_wells);
     for i=1:num_wells
        well_locs(:,i) = (well_loc_l1(i) + (0:4)*increment)';
     end
+    
     W = [];
     for i=1:num_wells
        W = addWell(W, G, rock, well_locs(:,i), ...
@@ -89,26 +93,30 @@ function [VE_states, reports] = simulationVE(i)
     VE_initState.s        = repmat([1,0], Gt.cells.num, 1);
     VE_initState.sGmax    = VE_initState.s(:,2);
         
-    bc2D     = addBC([], bcIxVE, 'pressure', Gt.faces.z(bcIxVE)*rhow*g(3));
+    %bc2D     = addBC([], bcIxVE, 'pressure', Gt.faces.z(bcIxVE) * rhow * g(3));
+    bc2D     = addBC([], bcIxVE, 'flux', 0);
     bc2D.sat = repmat([1,0], numel(bcIxVE), 1);
 
     %% Schedule
     min_rate  = 0.5             * mega * 1e3 / year / rhoc;
     well_rate = 10 * rand(1,20) * mega * 1e3 / year / rhoc;
     well_rate(well_rate<min_rate) = 0;
-    well_rate = well_rate * (100 / (rhoc*sum(well_rate*year/2)/mega/1e3));
+    well_rate = well_rate * (50 / (rhoc*sum(well_rate*year/2)/mega/1e3));
+    
     for i=1:20
         VE_schedule.control(i) = struct('W', W2D, 'bc', bc2D);
     end
     VE_schedule.control(21) = struct('W', W2D, 'bc', bc2D);
+    
     for i=1:num_wells
         VE_schedule.control(21).W(i).val = 0;
         for k=1:20
             VE_schedule.control(k).W(i).val = well_rate(k);
         end
     end
-    VE_schedule.step.val     = [repmat(year/2,20,1); repmat(50*year,10,1)];
-    VE_schedule.step.control = [linspace(1,20,20)';  ones(10,1)*21];
+    
+    VE_schedule.step.val     = [repmat(year/2,20,1); repmat(50*year,20,1)];
+    VE_schedule.step.control = [linspace(1,20,20)';  ones(20,1)*21];
 
     %% Simulation
     VE_model       = CO2VEBlackOilTypeModel(Gt, rock2D, VE_fluid);
@@ -116,19 +124,9 @@ function [VE_states, reports] = simulationVE(i)
     VE_states      = [{VE_initState} VE_states(:)'];
 
     %% Trap Analysis
-    ta      = trapAnalysis(Gt, false);
-    reports = makeReports(Gt, VE_states, VE_model.rock, VE_model.fluid, VE_schedule, ...
-                            [srw, src], ta, []);
-
-
-    %% Plot
-    %{
-    figure(1); clf; plotCellData(G, rock.poro); plotWell(G,W); view(-63,50); colormap jet; colorbar
-    figure(2); clf; plotCellData(G, log10(convertTo(rock.perm(:,1), milli*darcy))); plotWell(G,W); view(-63,50); colormap jet; colorbar
-    figure(3); clf; plotToolbar(Gt, VE_states); view(-63,50); colormap(parula.^2)
-    h1 = figure(4); plot(1); ax = get(h1, 'currentaxes');
-    plotTrappingDistribution(ax, reports, 'legend_location', 'northwest');
-    figure(5); clf; plot_VE_simulation
-    %}
+    ta         = trapAnalysis(Gt, false);
+    ta_reports = makeReports(Gt, VE_states, ...
+                             VE_model.rock, VE_model.fluid, VE_schedule, ...
+                             [srw, src], ta, []);
 
 end

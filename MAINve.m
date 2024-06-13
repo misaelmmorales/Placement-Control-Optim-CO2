@@ -10,8 +10,10 @@ mrstModule add ad-core ad-props co2lab coarsegrid mrst-gui
 %% Grid, Rock, BCs
 grdecl = readGRDECL([fullfile(mrstPath('co2lab'),'data','johansen','NPD5'),'.grdecl']);
 
+realization=1211;
+
 % load permeability and porosity
-r = load(sprintf('data_100_100_11/rock/rock_%d.mat', i));
+r = load(sprintf('data_100_100_11/rock/rock_%d.mat', realization));
 p = r.poro(:);
 K = 10.^r.perm(:);
 
@@ -96,10 +98,6 @@ end
 W2D = convertwellsVE(W, G, Gt, rock2D);
 
 %% Vertical Equilibrium simulation
-VE_initState.pressure = rhow*g(3)*Gt.cells.z;
-VE_initState.s        = repmat([1,0], Gt.cells.num, 1);
-VE_initState.sGmax    = VE_initState.s(:,2);
-
 invPc3D  = @(pc) (1-srw) .* (pe./max(pc,pe)).^2 + srw; 
 kr3D     = @(s) max((s-src)./(1-src), 0).^2;
 VE_fluid = makeVEFluid(Gt, rock2D, 'P-scaled table'     , ...
@@ -116,10 +114,15 @@ VE_fluid = makeVEFluid(Gt, rock2D, 'P-scaled table'     , ...
                        'kr3D'        , kr3D             , ...
                        'transMult'   , transMult);
 
-bc2D     = addBC([], bcIxVE, 'pressure', Gt.faces.z(bcIxVE) * rhow * g(3));
+VE_initState.pressure = rhow*g(3)*Gt.cells.z;
+VE_initState.s        = repmat([1,0], Gt.cells.num, 1);
+VE_initState.sGmax    = VE_initState.s(:,2);
+
+%bc2D     = addBC([], bcIxVE, 'pressure', Gt.faces.z(bcIxVE) * rhow * g(3));
+bc2D     = addBC([], bcIxVE, 'flux', 0);
 bc2D.sat = repmat([1,0], numel(bcIxVE), 1);
 
-% schedule
+%% Schedule
 min_rate  = 0.5             * mega * 1e3 / year / rhoc;
 well_rate = 10 * rand(1,20) * mega * 1e3 / year / rhoc;
 well_rate(well_rate<min_rate) = 0;
@@ -137,12 +140,23 @@ for i=1:num_wells
     end
 end
 
-VE_schedule.step.val     = [repmat(year/2,20,1); repmat(50*year,10,1)];
-VE_schedule.step.control = [linspace(1,20,20)';  ones(10,1)*21];
+VE_schedule.step.val     = [repmat(year/2,20,1); repmat(50*year,20,1)];
+VE_schedule.step.control = [linspace(1,20,20)';  ones(20,1)*21];
 
+%% VE simulation
 VE_model                = CO2VEBlackOilTypeModel(Gt, rock2D, VE_fluid);
 [VE_wellSol, VE_states] = simulateScheduleAD(VE_initState, VE_model, VE_schedule);
 VE_states               = [{VE_initState} VE_states(:)'];
+[WaterRate, OilRate, GasRate, BHP] = wellSolToVector(VE_wellSol);
+
+%% Trap Analysis
+ta = trapAnalysis(Gt, false);
+trap_reports = makeReports(Gt, VE_states, ...
+                            VE_model.rock, VE_model.fluid, VE_schedule, ...
+                            [srw, src], ta, []);
+
+h1 = figure; plot(1); ax = get(h1, 'currentaxes');
+plotTrappingDistribution(ax, trap_reports, 'legend_location', 'northwest');
 
 %% Plot
 figure
@@ -165,8 +179,4 @@ for i=1:numel(VE_states)
     hs = plotCellData(Gt.parent, sat); drawnow
 end
 
-ta = trapAnalysis(Gt, false);
-reports = makeReports(Gt, VE_states, VE_model.rock, VE_model.fluid, VE_schedule, ...
-                        [srw, src], ta, []);
-h1 = figure; plot(1); ax = get(h1, 'currentaxes');
-plotTrappingDistribution(ax, reports, 'legend_location', 'northwest');
+%% END
