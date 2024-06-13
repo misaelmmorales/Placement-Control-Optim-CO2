@@ -4,3 +4,4 @@ optim_placement/data_mat/results.mat
 Johansen/data/*
 data_100_100_11/perm_1000.csv
 data_100_100_11/perm_272.csv
+data_100_100_11/VE_*
