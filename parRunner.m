@@ -7,16 +7,16 @@ clear; clc; close all
 set(0,'DefaultFigureWindowStyle','docked')
 mrstModule add ad-core ad-props co2lab coarsegrid mrst-gui linearsolvers
 
-%% VE Runner
-n_realizations = 318*4;
+%% 3D Runner
+n_realizations = 50; %318*4
 
 parfor i=1:n_realizations
-    [VE_states, ta_reports] = simulationVE(i-1)
+    [states, ta_reports] = simulation(i-1, 'noflow')
 
-    sname = sprintf('data_100_100_11/VE_states/states_%d', i-1);
-    parsave(sname, VE_states)
+    sname = sprintf('data_100_100_11/states/states_%d', i-1);
+    parsave(sname, states)
     
-    rname = sprintf('data_100_100_11/VE_reports/reports_%d', i-1);
+    rname = sprintf('data_100_100_11/reports/reports_%d', i-1);
     parsave(rname, ta_reports)
 
     fprintf('Simulation %i done\n', i)

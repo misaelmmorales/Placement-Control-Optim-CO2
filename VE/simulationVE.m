@@ -1,4 +1,4 @@
-function [VE_states, ta_reports] = simulationVE(realization)
+function [VE_states, ta_reports] = simulationVE(realization, bc_type)
     %% Grid, Rock, and BCs
     grdecl = readGRDECL([fullfile(mrstPath('co2lab'),'data','johansen','NPD5'),'.grdecl']);
 
@@ -92,17 +92,32 @@ function [VE_states, ta_reports] = simulationVE(realization)
     VE_initState.pressure = rhow*g(3)*Gt.cells.z;
     VE_initState.s        = repmat([1,0], Gt.cells.num, 1);
     VE_initState.sGmax    = VE_initState.s(:,2);
-        
-    %bc2D     = addBC([], bcIxVE, 'pressure', Gt.faces.z(bcIxVE) * rhow * g(3));
-    bc2D     = addBC([], bcIxVE, 'flux', 0);
+    
+    if strcmp(bc_type,'noflow')
+        bc2D     = addBC([], bcIxVE, 'flux', 0, 'sat', [1,0]);
+    elseif strcmp(bc_type,'constP')
+        bc2D     = addBC([], bcIxVE, 'pressure', Gt.faces.z(bcIxVE) * rhow * g(3), 'sat', [1,0]);
+    else
+        error('Invalid Boundary Condition (bc_type). Choose either (noflow) or (constP).')
+    end
     bc2D.sat = repmat([1,0], numel(bcIxVE), 1);
 
-    %% Schedule
-    min_rate  = 0.5             * mega * 1e3 / year / rhoc;
-    well_rate = 10 * rand(1,20) * mega * 1e3 / year / rhoc;
-    well_rate(well_rate<min_rate) = 0;
-    well_rate = well_rate * (50 / (rhoc*sum(well_rate*year/2)/mega/1e3));
-    
+    %% Schedule    
+    % 100 -> 500 MT in 10 years = 50 MT per year
+    % 50 -> 250 MT in 10 years = 25 MT per year
+    % 20 -> 100 MT in 10 years = 10 MT per year
+    % 10 -> 50 MT in 10 years = 5 MT per year
+
+    cum_co2_inj = 200 * mega * 1e3 / rhoc;
+    min_rate  = 0.2                 * mega * 1e3 / year / rhoc;
+    well_rate = rand(num_wells, 20) * mega * 1e3 / year / rhoc;
+    well_rate(well_rate < min_rate) = 0;
+    rowSums = sum(well_rate, 2);
+    scalingFactors = cum_co2_inj ./ rowSums;
+    for i=1:num_wells
+        well_rate(i,:) = well_rate(i,:) * scalingFactors(i) / year;
+    end
+     
     for i=1:20
         VE_schedule.control(i) = struct('W', W2D, 'bc', bc2D);
     end
@@ -111,7 +126,7 @@ function [VE_states, ta_reports] = simulationVE(realization)
     for i=1:num_wells
         VE_schedule.control(21).W(i).val = 0;
         for k=1:20
-            VE_schedule.control(k).W(i).val = well_rate(k);
+            VE_schedule.control(k).W(i).val = well_rate(i,k);
         end
     end
     
