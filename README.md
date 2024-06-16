@@ -1,5 +1,5 @@
 # Placement-Control-Optim-CO2
-Well placement and control optimization for CO2 sequestration
+Misael M. Morales, Carlos Torres-Verdin, and Michael Pyrcz. (in preparation). Well placement and control optimization for geologic CO<sub>2</sub> storage prediction under geologic uncertainty using a spatiotemporal deep learning proxy.
 
 Notes: 
 - objective function: minimize plume area, minimize risk of leakage well, minimize risk of fault transmissibility
