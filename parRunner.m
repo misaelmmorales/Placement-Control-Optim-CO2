@@ -42,3 +42,20 @@ end
 % plotToolbar(G, states); plotWell(G,W); colormap jet; colorbar; view(-63,50)
 
 % grdecl = readGRDECL([fullfile(mrstPath('co2lab'),'data','johansen','NPD5'),'.grdecl']);
+
+% Legacy Wells:
+% xl = [8; 10; 49];
+% yl = [3; 92; 14];
+% WL = [];
+% for i=1:3
+%     wg = false(G.cartDims);
+%     wg(xl(i), yl(i), :) = true;
+%     wc = find(wg(G.cells.indexMap));
+%     wp = g(3) * rhow * G.cells.centroids(wc,3);
+%     WL = verticalWell(WL, G, rock, xl(i), yl(i), []    , ...
+%                       'name'  , ['Legacy', int2str(i)] , ...
+%                       'sign'  , 0                      , ...
+%                       'type'  , 'bhp'                  , ...
+%                       'val'   , wp(end)                , ...       
+%                       'compi' , [0 1]);
+% end
