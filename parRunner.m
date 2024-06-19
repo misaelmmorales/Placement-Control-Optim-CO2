@@ -1,7 +1,7 @@
 %% Main variables
 proj_dir = pwd;
-%mdir = 'C:/Users/Misael Morales/OneDrive - The University of Texas at Austin/Documents/MATLAB/mrst-2022b';
-mdir = 'C:/Users/mmm6558/OneDrive - The University of Texas at Austin/Documents/MATLAB/mrst-2022b';
+mdir = 'C:/Users/Misael Morales/OneDrive - The University of Texas at Austin/Documents/MATLAB/mrst-2022b';
+%mdir = 'C:/Users/mmm6558/OneDrive - The University of Texas at Austin/Documents/MATLAB/mrst-2022b';
 chdir(mdir); startup; chdir(proj_dir);
 clear; clc; close all
 
@@ -24,6 +24,7 @@ bc = addBC(bc, bcIx, 'pressure', p_bc, 'sat', [1, 0]);
 %% RUNNER
 n_realizations = 318*4;
 parfor i=1:n_realizations
+    fprintf('Simulation %i starting\n', i)
     rock        = gen_rock(i-1, G);
     [W,x,y]     = gen_wells(G, rock);
     [schedule]  = gen_schedule(W, bc, fluid);
