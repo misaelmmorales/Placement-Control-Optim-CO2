@@ -4,7 +4,7 @@ function [schedule] = gen_schedule(W, bc, fluid)
 
     well_rate = 5*rand(num_wells,20);
     well_rate(well_rate < 0.5) = 0;
-    well_rate = well_rate * (5*10*num_wells / sum(sum(well_rate)));
+    well_rate = well_rate * (7.5*10*num_wells / sum(sum(well_rate)));
     %well_rate = well_rate * (7.5*10*num_wells / sum(well_rate,'all'));
     well_rate = well_rate * 1e3 * mega / year / fluid.rhoGS;
 
