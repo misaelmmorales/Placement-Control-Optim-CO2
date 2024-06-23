@@ -5,3 +5,5 @@ Johansen/data/*
 data_100_100_11/perm_1000.csv
 data_100_100_11/perm_272.csv
 data_100_100_11/VE_*
+data_100_100_11/states/*
+data_100_100_11/well_coords/*
