@@ -1,7 +1,6 @@
-function [W, x, y] = gen_wells(G, rock)
-    %% Well(s)
-
+function [W, W2D, x, y] = gen_wells_VE(G, Gt, rock, rock2D)
     num_wells   = randi([1,5]);
+    
     wc_global = false(G.cartDims);
     wc_global(G.cells.indexMap) = true;
     actnum_f = wc_global(:,:,end-1);
@@ -11,7 +10,7 @@ function [W, x, y] = gen_wells(G, rock)
 
     W = [];
     for i=1:num_wells
-       W = verticalWell(W, G, rock, x(i), y(i), 10       , ...
+       W = verticalWell(W, G, rock, x(i), y(i), 6:10       , ...
                         'name'         , ['I', int2str(i)] , ...
                         'sign'         , 1                 , ...
                         'InnerProduct' , 'ip_tpf'          , ...
@@ -19,6 +18,7 @@ function [W, x, y] = gen_wells(G, rock)
                         'compi'        , [0 1]             );
     end
 
+    W2D = convertwellsVE(W, G, Gt, rock2D);
 
 end
 

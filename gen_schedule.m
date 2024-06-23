@@ -1,15 +1,42 @@
 function [schedule] = gen_schedule(W, bc, fluid)
     %% Schedule
     num_wells = length(W);
-
-    well_rate = 5*rand(num_wells,20);
-    well_rate(well_rate < 0.5) = 0;
-    %well_rate = well_rate * (7.5*10*num_wells / sum(sum(well_rate)));
-    well_rate = well_rate * (5*num_wells / sum(well_rate,'all'));
+    
+    cum_co2 = 20;
+    well_rate = cum_co2*rand(num_wells,20);
+    well_rate(well_rate < 1) = 0;
+    well_rate = well_rate * (cum_co2*10*num_wells / sum(well_rate,'all'));
     well_rate = well_rate * 1e3 * mega / year / fluid.rhoGS;
 
-    % 10 rampup timesteps
-    rampsteps = rampupTimesteps(year/2, year/2, 9); 
+    rampsteps = rampupTimesteps(10*year, year/2);
+
+    for i=1:28
+        schedule.control(i) = struct('W', W, 'bc', bc);
+    end
+    
+    for k=1:num_wells
+        for i=1:8
+            schedule.control(i).W(k).val = well_rate(k,1);
+        end
+        for i=9:28
+            schedule.control(i).W(k).val = well_rate(k,i-8);
+        end
+    end
+
+    schedule.step.val     = rampsteps;
+    schedule.step.control = [ones(9,1); linspace(2,20,19)'];
+
+end
+
+%{
+    %% Injection (10 years) + Monitoring (1000 years)
+    cum_co2_inj = 1;
+    well_rate = cum_co2_inj*rand(num_wells,20);
+    well_rate(well_rate < 0.5) = 0;
+    well_rate = well_rate * (cum_co2_inj*num_wells / sum(well_rate,'all'));
+    well_rate = well_rate * 1e3 * mega / year / fluid.rhoGS;
+
+    rampsteps = rampupTimesteps(year/2, year/2, 9); %10 rampups
     
     % 31 controls [10 rampup, 19 schedules, 10 monitor]
     for i=1:31
@@ -29,6 +56,4 @@ function [schedule] = gen_schedule(W, bc, fluid)
 
     schedule.step.val     = [rampsteps;  repmat(year/2,19,1); repmat(100*year,10,1)];
     schedule.step.control = [ones(10,1); linspace(2,20,19)';  ones(10,1)*21];
-
-end
-
+%}

@@ -22,14 +22,14 @@ p_bc = rhow * g(3) * G.faces.centroids(bcIx, 3);
 bc = addBC(bc, bcIx, 'pressure', p_bc, 'sat', [1, 0]);
 
 %% RUNNER
-n_realizations = 5; %318*4;
+n_realizations = 318*4;
 parfor i=1:n_realizations
     fprintf('Simulation %i starting\n', i)
-    rock        = gen_rock(i-1, G);
+    [rock]      = gen_rock(i-1, G);
     [W,x,y]     = gen_wells(G, rock);
     [schedule]  = gen_schedule(W, bc, fluid);
-    [~, states] = gen_simulation(G, rock, fluid, initState, schedule);
-    parsave(sprintf('data_100_100_11/states/states_%d', i-1), states)
+    [~,states]  = gen_simulation(G, rock, fluid, initState, schedule);
+    parsave(sprintf('data_100_100_11/states/states_%d', i-1), [{initState} states(:)'])
     parsave(sprintf('data_100_100_11/well_coords/well_coords_%d', i-1), struct('X',x,'Y',y));
     fprintf('Simulation %i done\n', i)
 end
