@@ -140,6 +140,9 @@ schedule.step.val = [repmat(year, 100, 1); ...
 schedule.step.control = [ones(100, 1); ...
                          ones(100, 1) * 2];
 
+% match my experiment: 10 years injection, rates every 6 months (20 steps)
+schedule.step.val = [repmat(year/2, 20, 1)];
+schedule.step.control = [ones(20,1)];
 %% Model
 
 model = TwoPhaseWaterGasModel(G, rock, fluid, 0, 0);
