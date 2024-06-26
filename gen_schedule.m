@@ -2,7 +2,7 @@ function [schedule, well_rate] = gen_schedule(W, bc, fluid)
     %% Schedule
     num_wells = length(W);
     
-    cum_co2   = 15;
+    cum_co2   = 20;
     well_rate = cum_co2*rand(num_wells,20);
     well_rate(well_rate < 2) = 0;
     well_rate = well_rate * (cum_co2*10*num_wells / sum(well_rate,'all'));
