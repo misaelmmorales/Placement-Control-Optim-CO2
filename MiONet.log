@@ -1,0 +1,16 @@
+/work/08649/mmm6558/ls6/Placement-Control-Optim-CO2
+Tue Jul  2 09:58:08 CDT 2024
+------------------------------------------------------------
+----------------------- VERSION INFO -----------------------
+Torch version: 2.1.1+cu121 | Torch Built with CUDA? True
+# Device(s) available: 2, Name(s): NVIDIA H100 PCIe
+------------------------------------------------------------
+# params: 303,850,096
+Epoch: 0 | Loss: 0.0772 | Valid Loss: 0.0441
+Epoch: 50 | Loss: 0.0055 | Valid Loss: 0.0154
+Epoch: 100 | Loss: 0.0022 | Valid Loss: 0.0137
+Epoch: 150 | Loss: 0.0013 | Valid Loss: 0.0138
+Epoch: 200 | Loss: 0.0010 | Valid Loss: 0.0143
+Epoch: 250 | Loss: 0.0008 | Valid Loss: 0.0146
+Epoch: 300 | Loss: 0.0007 | Valid Loss: 0.0145
+Total training time: 232.717 minutes
