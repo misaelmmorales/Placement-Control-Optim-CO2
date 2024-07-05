@@ -156,7 +156,7 @@ class CustomDataset(Dataset):
         xw = x['locs']           / (100)
         xc = x['ctrl'][1:]       * co2_rho*sec2year/mega/1e3/(25)
         xt = x['time'][1:]       / sec2year / (100)
-        yp = y['pressure'][2:]   / psi2pascal
+        yp = y['pressure'][2:]   / psi2pascal / (1e4)
         ys = y['saturation'][2:] / 0.8
         yy = np.concatenate([np.expand_dims(yp,0), np.expand_dims(ys,0)], axis=0)
 

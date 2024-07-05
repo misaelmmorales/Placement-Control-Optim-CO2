@@ -132,9 +132,9 @@ class CustomDataset(Dataset):
         
         xw = x['locs'] / 100
         xc = np.concatenate([np.zeros((1,xw.shape[-1])), x['ctrl']], axis=0) *co2_rho*sec2year/mega/1e3 /25
-        xt = np.expand_dims(np.insert(x['time'], 0, 0), -1)
+        xt = np.expand_dims(np.insert(x['time']/sec2year/100, 0, 0), -1)
         yp = y['pressure'] /psi2pascal/1e4
-        ys = y['saturation']
+        ys = y['saturation'] / 0.8
         yy = np.concatenate([np.expand_dims(yp,1), np.expand_dims(ys,1)], axis=1)
 
         xm = torch.tensor(xm, dtype=torch.float32, device=device)
