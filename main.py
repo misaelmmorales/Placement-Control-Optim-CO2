@@ -196,5 +196,5 @@ losses.to_csv('MiONet_losses.csv', index=False)
 
 for i, (xx,yy) in enumerate(dataset):
     yp = model(xx).detach().cpu().numpy()
-    np.save('data_npy_100_100_11/predictions/y_pred_{}'.format(i), yp)
+    np.save('data_npy_100_100_11/predictions_mionet/y_pred_{}'.format(i), yp)
 print('Predictions saved!')
