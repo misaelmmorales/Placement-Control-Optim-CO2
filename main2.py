@@ -209,7 +209,7 @@ for epoch in range(epochs):
     valid_loss.append(np.mean(epoch_valid_loss))
     # monitor
     if epoch % monitor == 0:
-        print('Epoch: {} | Loss: {:.4f} | Valid Loss: {:.4f}'.format(epoch, train_loss[-1], valid_loss[-1]))
+        print('Epoch: {}/{} | Loss: {:.4f} | Valid Loss: {:.4f}'.format(epoch+1, epochs-1, train_loss[-1], valid_loss[-1]))
 train_time = time() - start
 print('Total training time: {:.3f} minutes'.format(train_time/60))
 
