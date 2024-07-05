@@ -1,5 +1,6 @@
 import os
 import numpy as np
+import matplotlib.pyplot as plt
 from scipy.io import loadmat
 import torch
 import torch.nn as nn
@@ -132,3 +133,12 @@ class CustomDataset(Dataset):
         yy = torch.tensor(yy, dtype=torch.float32, device=device)
 
         return (xm, xg, xw, xc, xt), yy
+    
+def plot_loss(history, figsize=(8,4)):
+    plt.figure(figsize=figsize)
+    plt.plot(history.index, history['train'], ls='-', label='Train')
+    plt.plot(history.index, history['valid'], ls='-', label='Valid')
+    plt.xlabel('Epoch'); plt.ylabel('Loss')
+    plt.legend(); plt.grid(True, which='both')
+    plt.tight_layout(); plt.savefig('loss.png'); plt.show()
+    return None

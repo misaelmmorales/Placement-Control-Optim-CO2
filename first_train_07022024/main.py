@@ -122,18 +122,18 @@ class CustomDataset(Dataset):
         x  = np.load(os.path.join(self.x_folder, self.x_file_list[idx]))
         y  = np.load(os.path.join(self.y_folder, self.y_file_list[idx]))
 
-        xg = np.concatenate([np.expand_dims(Tops/3000, 0), 
+        xg = np.concatenate([np.expand_dims(Tops, 0), 
                              np.expand_dims(Grid, 0)], 
                              axis=0)
 
-        xm = np.concatenate([np.expand_dims(x['poro']/0.3,0), 
-                             np.expand_dims(x['perm']/3.3,0)], 
+        xm = np.concatenate([np.expand_dims(x['poro'],0), 
+                             np.expand_dims(x['perm'],0)], 
                              axis=0)
         
-        xw = x['locs'] / 100
-        xc = np.concatenate([np.zeros((1,xw.shape[-1])), x['ctrl']], axis=0) *co2_rho*sec2year/mega/1e3 /25
+        xw = x['locs']
+        xc = np.concatenate([np.zeros((1,xw.shape[-1])), x['ctrl']], axis=0)
         xt = np.expand_dims(np.insert(x['time'], 0, 0), -1)
-        yp = y['pressure'] /psi2pascal/1e4
+        yp = y['pressure']
         ys = y['saturation']
         yy = np.concatenate([np.expand_dims(yp,1), np.expand_dims(ys,1)], axis=1)
 
@@ -193,8 +193,3 @@ print('Total training time: {:.3f} minutes'.format(train_time/60))
 torch.save(model.state_dict(), 'MiONet.pth')
 losses = pd.DataFrame({'train': train_loss, 'valid': valid_loss})
 losses.to_csv('MiONet_losses.csv', index=False)
-
-for i, (xx,yy) in enumerate(dataset):
-    yp = model(xx).detach().cpu().numpy()
-    np.save('data_npy_100_100_11/predictions/y_pred_{}'.format(i), yp)
-print('Predictions saved!')

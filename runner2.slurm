@@ -15,4 +15,4 @@ pwd
 date
 
 # Run the program
-python3 main.py
+python3 main2.py
