@@ -1,0 +1,19 @@
+function [W] = gen_wells(G, rock, well_loc)
+%GEN_WELLS Summary of this function goes here
+%   Detailed explanation goes here
+
+num_wells = size(well_loc,1);
+
+W = [];
+for i=1:num_wells
+    W = verticalWell(W, G, rock, well_loc(i,1), well_loc(i,2), [], ...
+                    'Type',          'rate'  , ...
+                    'sign',          1       ,...
+                    'InnerProduct', 'ip_tpf' , ...
+                    'Radius',        0.05    , ...
+                    'Comp_i',        [0 1]   , ...
+                    'name',          ['Injector', int2str(i)] );
+end
+
+
+end

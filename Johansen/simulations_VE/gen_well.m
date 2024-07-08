@@ -1,0 +1,13 @@
+function [W] = gen_well(G, rock, props)
+
+    wc_global = false(G.cartDims); wc_global(48, 48, 6:10) = true;
+    wc        = find(wc_global(G.cells.indexMap));
+    
+    W = [];
+    W         = addWell(W, G, rock, wc, 'name','injector',...
+                  'type', 'rate', ...
+                  'val', 3.5 * mega * 1e3 / props.co2_rho / year, ...
+                  'sign', 1, ...
+                  'comp_i', [0 1]);
+
+end

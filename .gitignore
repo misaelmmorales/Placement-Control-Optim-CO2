@@ -1,7 +1,20 @@
 paper/*
+
+simulations2D/facies/*
+simulations2D/permeability/*
+simulations2D/porosity/*
+simulations2D/pressure/*
+simulations2D/saturation/*
+simulations2D/states/*
+simulations2D/wells/*
+simulations2D/input_features/*
+simulations2D/output_targets/*
+
 optim_placement/simulations/pressure.mat
 optim_placement/data_mat/results.mat
+
 Johansen/data/*
+
 data_100_100_11/perm_1000.csv
 data_100_100_11/perm_272.csv
 data_100_100_11/VE_*
@@ -9,4 +22,6 @@ data_100_100_11/states/*
 data_100_100_11/well_coords/*
 data_100_100_11/well_rates/*
 data_npy_100_100_11/*
+
 MiONet.pth
+FTMioNet.pth
