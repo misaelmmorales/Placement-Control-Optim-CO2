@@ -1,0 +1,15 @@
+PS D:\Placement-Control-Optim-CO2> & C:/ProgramData/Anaconda3/envs/torchy/python.exe d:/Placement-Control-Optim-CO2/main.pyCO2/main.py
+------------------------------------------------------------
+----------------------- VERSION INFO -----------------------
+Torch version: 2.1.2+cu118 | Torch Built with CUDA? True
+# Device(s) available: 1, Name(s): Quadro M6000 24GB
+------------------------------------------------------------
+# params: 303,850,096
+Epoch: 1/300 | Loss: 0.0493 | Valid Loss: 0.0361
+Epoch: 51/300 | Loss: 0.0036 | Valid Loss: 0.0179
+Epoch: 101/300 | Loss: 0.0022 | Valid Loss: 0.0182
+Epoch: 151/300 | Loss: 0.0018 | Valid Loss: 0.0174
+Epoch: 201/300 | Loss: 0.0014 | Valid Loss: 0.0174
+Epoch: 251/300 | Loss: 0.0010 | Valid Loss: 0.0166
+Epoch: 301/300 | Loss: 0.0008 | Valid Loss: 0.0164
+Total training time: 748.944 minutes
