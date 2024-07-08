@@ -1,6 +1,7 @@
 function [rock] = gen_rock(realization, G)
 
-    r = load(sprintf('data_100_100_11/rock/rock_%d.mat', realization));
+    %r = load(sprintf('data_100_100_11/rock/rock_%d.mat', realization));
+    r = load(sprintf('E:/Placement-Control-Optim-CO2/data_100_100_11/rock/rock_%d.mat', realization));
     p = r.poro(:);
     K = 10.^r.perm(:);  
     

@@ -9,8 +9,16 @@ import torch.nn as nn
 import torch.optim as optim
 from neuralop.models import *
 from torch.utils.data import Dataset, DataLoader, TensorDataset, random_split
-
 from transformers import Swinv2Model, Swinv2Config
+
+from torchmetrics.image import StructuralSimilarityIndexMeasure as SSIMLoss
+from torchmetrics.image import RelativeAverageSpectralError as RASELoss
+from torchmetrics.image import SpatialCorrelationCoefficient as SCCLoss
+from torchmetrics.image import SpectralAngleMapper as SAMLoss
+from torchmetrics.image import SpectralDistortionIndex as SDILoss
+from torchmetrics.image import TotalVariation as TVmetrics
+from torchmetrics.image import UniversalImageQualityIndex as UIQILoss
+from torchmetrics.image import VisualInformationFidelity as VIFLoss
 
 sec2year   = 365.25 * 24 * 60 * 60
 psi2pascal = 6894.76
