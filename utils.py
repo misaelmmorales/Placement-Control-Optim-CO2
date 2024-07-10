@@ -2,6 +2,7 @@ import os
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy.io import loadmat
+import tensorflow as tf
 import torch
 import torch.nn as nn
 from torch.utils.data import Dataset
@@ -34,6 +35,20 @@ def check_torch(verbose:bool=True):
             print('-'*60)
         device = torch.device('cpu')
         return device
+
+def check_tf_gpu():
+    sys_info = tf.sysconfig.get_build_info()
+    version, cuda, cudnn = tf.__version__, sys_info["cuda_version"], sys_info["cudnn_version"]
+    count = len(tf.config.experimental.list_physical_devices())
+    name  = [device.name for device in tf.config.experimental.list_physical_devices('GPU')]
+    print('-'*60)
+    print('----------------------- VERSION INFO -----------------------')
+    print('TF version: {} | # Device(s) available: {}'.format(version, count))
+    print('TF Built with CUDA? {} | CUDA: {} | cuDNN: {}'.format(tf.test.is_built_with_cuda(), cuda, cudnn))
+    print(tf.config.list_physical_devices()[0],'\n', tf.config.list_physical_devices()[1])
+    print('-'*60+'\n')
+    return None
+
 device = check_torch(verbose=False)
 
 class MiONet(nn.Module):
