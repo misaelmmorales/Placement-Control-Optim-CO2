@@ -1,18 +1,27 @@
-function [schedule] = gen_schedule(W2D, bc2D)
-    % Setting up two copies of the well and boundary specifications. 
-    % Modifying the well in the second copy to have a zero flow rate.
-    schedule.control    = struct('W', W2D, 'bc', bc2D);
-    schedule.control(2) = struct('W', W2D, 'bc', bc2D);
-    schedule.control(2).W.val = 0;
+function [schedule, well_rate] = gen_schedule(W2D, bc2D, props)
+    %% Schedule
+    num_wells = length(W2D);
     
-    % Specifying length of simulation timesteps
-    schedule.step.val = [repmat(year/2,  20, 1); ...
-                         repmat(10*year, 50, 1)];
-    
-    % Specifying which control to use for each timestep.
-    % The first 20 timesteps will use control 1, the last 50
-    % timesteps will use control 2.
-    schedule.step.control = [ones(20, 1); ones(50, 1)*2];
+    cum_co2   = 10;
+    well_rate = cum_co2*rand(num_wells,20);
+    well_rate(well_rate < 2) = 0;
+    well_rate = well_rate * (cum_co2*10*num_wells / sum(well_rate,'all'));
+    well_rate = well_rate * 1e3 * mega / year / props.co2_rho;
+
+    %%% [8 rampups, 20 injection, 5 monitor] (33 steps = 9+19+5)
+    well_rate = [repmat(well_rate(:,1),1,8), well_rate, zeros(num_wells,5)];
+
+    rampsteps = rampupTimesteps(10*year, year/2);
+
+    for i=1:33
+        schedule.control(i) = struct('W', W2D, 'bc', bc2D);
+        for k=1:num_wells
+            schedule.control(i).W(k).val = well_rate(k,i);
+        end
+    end
+
+    schedule.step.val     = [rampsteps; repmat(20*year,5,1)];
+    schedule.step.control = linspace(1,33,33);
 
 end
 

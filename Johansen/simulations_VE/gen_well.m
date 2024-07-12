@@ -1,13 +1,21 @@
-function [W] = gen_well(G, rock, props)
+function [W, x, y] = gen_well(G, rock)
 
-    wc_global = false(G.cartDims); wc_global(48, 48, 6:10) = true;
-    wc        = find(wc_global(G.cells.indexMap));
-    
+    num_wells   = randi([1,5]);
+    wc_global   = false(G.cartDims);
+    wc_global(G.cells.indexMap) = true;
+    actnum_f    = wc_global(:,:,end-1);
+    index       = find(actnum_f);
+    select      = index(randperm(length(index), num_wells));
+    [x,y]       = ind2sub(size(actnum_f), select);
+
     W = [];
-    W         = addWell(W, G, rock, wc, 'name','injector',...
-                  'type', 'rate', ...
-                  'val', 3.5 * mega * 1e3 / props.co2_rho / year, ...
-                  'sign', 1, ...
-                  'comp_i', [0 1]);
+    for i=1:num_wells
+       W = verticalWell(W, G, rock, x(i), y(i), 6:10       , ...
+                        'name'         , ['I', int2str(i)] , ...
+                        'sign'         , 1                 , ...
+                        'InnerProduct' , 'ip_tpf'          , ...
+                        'type'         , 'rate'            , ...
+                        'compi'        , [0 1]             );
+    end
 
 end

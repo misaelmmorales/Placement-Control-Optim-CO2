@@ -1,7 +1,7 @@
 function [fluid] = gen_fluid(Gt, rock, props, transMult)
     
     % uses CO2 saturation
-    invPc3D = @(pc) (1-props.srw) .* (props.pe./max(pc, props.pe)).^2 + props.srw;
+    invPc3D = @(pc) (1-props.srw) .* (props.pe ./ max(pc, props.pe)).^2 + props.srw;
     kr3D    = @(s) max((s-props.src) ./ (1-props.src), 0).^2; 
 
     fluid   = makeVEFluid(Gt, rock, 'P-scaled table'          , ...
