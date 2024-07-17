@@ -1,4 +1,4 @@
-mrstModule add ad-core ad-props co2lab
+mrstModule add ad-core ad-props co2lab-legacy
 gravity reset on;
 
 parfor i=1:1272
