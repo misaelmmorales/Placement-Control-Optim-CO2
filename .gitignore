@@ -15,13 +15,10 @@ optim_placement/simulations/pressure.mat
 optim_placement/data_mat/results.mat
 
 Johansen/data/*
-
 Johansen/data_100_100_11/perm_1000.csv
 Johansen/data_100_100_11/perm_272.csv
 Johansen/data_100_100_11/*/*.mat
-
-Johansen/data_100_100_11/rock/*
-Johansen/data_100_100_11/facies/*
+Johansen/data_100_100_11/*/*.npy
 Johansen/data_npy_100_100_11/*/*.npz
 
 MiONet.pth
