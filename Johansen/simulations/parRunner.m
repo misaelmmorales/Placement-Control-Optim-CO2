@@ -1,6 +1,6 @@
 %% Main variables
 proj_dir = pwd;
-mdir = 'C:/Users/Misael Morales/OneDrive - The University of Texas at Austin/Documents/MATLAB/mrst-2022b';
+mdir = 'D:\MATLAB\mrst-2024a';
 %mdir = 'C:/Users/mmm6558/OneDrive - The University of Texas at Austin/Documents/MATLAB/mrst-2022b';
 chdir(mdir); startup; chdir(proj_dir);
 clear; clc; close all
