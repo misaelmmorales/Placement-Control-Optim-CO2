@@ -25,8 +25,7 @@ Johansen/data_100_100_11/well_rates/*
 
 Johansen/data_100_100_11/rock/*
 Johansen/data_100_100_11/facies/*
-
-Johansen/data_npy_100_100_11/*
+Johansen/data_npy_100_100_11/*/*.npz
 
 MiONet.pth
 FTMioNet.pth
