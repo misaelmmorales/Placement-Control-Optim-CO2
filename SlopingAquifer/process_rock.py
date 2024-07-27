@@ -3,6 +3,7 @@ import numpy as np
 import pandas as pd
 from tqdm import tqdm
 import scipy.io as sio
+from multiprocessing import Pool
 from skimage.transform import resize
 from sklearn.preprocessing import MinMaxScaler
 
@@ -58,6 +59,28 @@ for i in tqdm(range(n_realiations*n_slices), desc='Processing Rock'):
     rock = np.stack([kk.flatten(order='F'), pp.flatten(order='F')], axis=0)
     np.savez('/mnt/e/Placement-Control-Optim-CO2/IGEM/rock/npz/rock_{}.npz'.format(i), perm=kk, poro=pp, facies=f, rock=rock)
     sio.savemat('/mnt/e/Placement-Control-Optim-CO2/IGEM/rock/mat/rock_{}.mat'.format(i), {'perm':kk, 'poro':pp, 'facies':f})
+
+def process_rock(i):
+    f = np.load('facies/npy/facies_{}.npy'.format(i))
+    f = np.clip(f, 0.25, 1.2)
+    k = k_all[i]
+    k = np.clip(k, -10, None)
+    kk = np.log10(10**(k+3.3) * f) /  1.6
+    pp = 10**((kk-9)/10)
+    if any(np.isnan(kk.flatten())):
+        print('k NAN:', i)
+    if any(np.isnan(pp.flatten())):
+        print('p NAN:', i)
+    rock = np.stack([kk.flatten(order='F'), pp.flatten(order='F')], axis=0)
+    np.savez('rock/npz/rock_{}.npz'.format(i), perm=kk, poro=pp, facies=f, rock=rock)
+    sio.savemat('rock/mat/rock_{}.mat'.format(i), {'perm':kk, 'poro':pp, 'facies':f})
+
+def run_parallel_processing(iterations, num_processes):
+    with Pool(processes=num_processes) as pool:
+        list(tqdm(pool.imap(process_rock, iterations), total=len(iterations), desc='Processing Rock-to-.mat'))
+
+iterations = list(range(n_realiations*n_slices))
+run_parallel_processing(iterations, num_processes=8)
 
 print('-'*50)
 print(' '*23, 'Done', ' '*23)

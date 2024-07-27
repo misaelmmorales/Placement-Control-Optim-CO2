@@ -24,13 +24,9 @@ Johansen/data_npy_100_100_11/*/*.npz
 MiONet.pth
 FTMioNet.pth
 
-IGEM/rock/*
-IGEM/facies/*
-IGEM/rock/perm_160x160x5_n159_b8
-IGEM/rock/perm_160x160x5_n159_b7
-IGEM/rock/perm_160x160x5_n159_b6
-IGEM/rock/perm_160x160x5_n159_b5
-IGEM/rock/perm_160x160x5_n159_b4
-IGEM/rock/perm_160x160x5_n159_b3
-IGEM/rock/perm_160x160x5_n159_b2
-IGEM/rock/perm_160x160x5_n159_b1
+SlopingAquifer/rock/*
+SlopingAquifer/facies/*
+SlopingAquifer/states/*
+SlopingAquifer/well_locs/*
+SlopingAquifer/controls/*
+SlopingAquifer/rock/perm_160x160x5_n159_b*
