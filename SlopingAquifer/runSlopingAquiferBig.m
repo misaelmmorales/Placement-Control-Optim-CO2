@@ -1,8 +1,8 @@
 %% VE-incomp: Sloping Aquifer Big
 % Set time parameters:
-% Inject CO2 for 100 years and study subsequent migration for 1200 years
-% until 1300 years after injection started. 
-% Steps: inj=10, migration=24.
+% Inject CO2 for 100 years and study subsequent migration for 1500 years
+% until 1600 years after injection started. 
+% Steps: inj=10, migration=30.
 % Max injection: 20 MT CO2 per year per well
 % The fluid data are chosen so that they are resonable at p = 300 bar
 % timesteps = [T, stopInj, dT, dT2]
@@ -25,10 +25,11 @@ p_init    = 300*barsa(); % ~ 4351 psia
 bcVE      = addBC([], bcIxVE, 'pressure', Gt.faces.z(bcIxVE)*fluidVE.rho(2)*norm(gravity));
 bcVE      = rmfield(bcVE,'sat');
 bcVE.h    = zeros(size(bcVE.face));
-timesteps = [1300*year(), 100*year(), 10*year(), 50*year()];
+timesteps = [1530*year(), 30*year(), 1*year(), 50*year()];
 max_inj   = 20; % in MT CO2
 
-parfor i=1:2
+%% Main loop
+parfor i=1:1272   
     [rock, rock2D] = gen_rock(G, Gt, i);
     [W, WVE, wellIx] = gen_wells(G, Gt, rock2D);
     [controls] = gen_controls(timesteps, max_inj, W, fluidVE);
