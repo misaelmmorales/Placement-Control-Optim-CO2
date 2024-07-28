@@ -48,7 +48,25 @@ end
 %% END
 
 %{
+progressQueue = parallel.pool.DataQueue;
+hWaitbar = waitbar(0, 'Processing...');
+afterEach(progressQueue, @(~) updateWaitbar(hWaitbar, numIterations));
+progressCount = 0;
 
+send(progressQueue, i); %inside parfor
+close(hWaitbar); %after parfor
+
+function updateWaitbar(hWaitbar, numIterations)
+    persistent count;
+    if isempty(count)
+        count = 0;
+    end
+    count = count + 1;
+    waitbar(count / numIterations, hWaitbar);
+end
+%}
+
+%{
 % Figures
 figure(1); clf
 alpha = 0.25;
@@ -75,5 +93,4 @@ title('LogPerm [mD]'); colormap jet; colorbar('horizontal'); view(-30,45)
 figure(2); clf; 
 plotToolbar(Gt, states, 'edgecolor','k','edgealpha',0.25); 
 view(-30,80); colorbar;
-
 %}
