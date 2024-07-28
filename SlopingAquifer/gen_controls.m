@@ -1,4 +1,4 @@
-function [controls] = gen_controls(timesteps, max_inj, W, fluidVE)
+function [controls] = gen_controls(timesteps, total_inj, min_inj, W, fluidVE)
 
     % Extract time parameters:
     T          = timesteps(1);
@@ -9,9 +9,9 @@ function [controls] = gen_controls(timesteps, max_inj, W, fluidVE)
 
     num_wells = size(W,1);
 
-    controls = max_inj * rand(num_wells, nTinj);
-    controls(controls < 1) = 0;
-    controls = controls .* ((max_inj*nTinj) ./ sum(controls, 2));
+    controls = total_inj * rand(num_wells, nTinj);
+    controls(controls < min_inj) = 0;
+    controls = controls * ((total_inj*nTinj) ./ sum(controls, 'all'));
     controls = controls * 1e3 * mega / fluidVE.rho(1) / year;
     
 end

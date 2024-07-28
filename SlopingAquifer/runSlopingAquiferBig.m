@@ -6,19 +6,18 @@
 % Max injection: 20 MT CO2 per year per well
 % The fluid data are chosen so that they are resonable at p = 300 bar
 % timesteps = [T, stopInj, dT, dT2]
-
 mrstModule add co2lab-common co2lab-spillpoint co2lab-legacy
 mrstModule add mimetic matlab_bgl mrst-gui
-clear;clc;close all
+clear;clc; %close all
 gravity on
 
 [G, Gt, ~, ~, bcIxVE] = makeSlopingAquiferBig(true);
 
 fluidVE = initVEFluidHForm(Gt, ...
                            'mu' , [0.056641 0.30860] .* centi*poise, ...
-                           'rho', [686.54 975.86] .* kilogram/meter^3, ...
-                           'sr' , 0.2, ... %residual co2 saturation
-                           'sw' , 0.1, ... %residual water saturation
+                           'rho', [686.54   975.86]  .* kilogram/meter^3, ...
+                           'sr' , 0.20, ... %residual co2 saturation
+                           'sw' , 0.27, ... %residual water saturation
                            'kwm', [0.2142 0.85]);
 ts        = findTrappingStructure(Gt);
 p_init    = 300*barsa(); % ~ 4351 psia
@@ -26,15 +25,18 @@ bcVE      = addBC([], bcIxVE, 'pressure', Gt.faces.z(bcIxVE)*fluidVE.rho(2)*norm
 bcVE      = rmfield(bcVE,'sat');
 bcVE.h    = zeros(size(bcVE.face));
 timesteps = [1530*year(), 30*year(), 1*year(), 50*year()];
-max_inj   = 20; % in MT CO2
+total_inj = (2000/30); % in MT CO2 ==> 2 GT over 30 years
+min_inj   = 3; % in MT CO2
 
 %% Main loop
 parfor i=1:1272   
-    [rock, rock2D] = gen_rock(G, Gt, i);
-    [W, WVE, wellIx] = gen_wells(G, Gt, rock2D);
-    [controls] = gen_controls(timesteps, max_inj, W, fluidVE);
+    [rock, rock2D]       = gen_rock(G, Gt, i);
+    [W, WVE, wellIx]     = gen_wells(G, Gt, rock2D);
+    [controls]           = gen_controls(timesteps, total_inj, min_inj, W, fluidVE);
     [SVE, preComp, sol0] = gen_init(Gt, rock2D, fluidVE, W, p_init);
-    [states] = gen_simulation(timesteps, sol0, Gt, rock2D, WVE, controls, fluidVE, bcVE, SVE, preComp, ts);
+    [states]             = gen_simulation(timesteps, sol0, Gt, rock2D, ...
+                                          WVE, controls, fluidVE, bcVE, ...
+                                          SVE, preComp, ts);
     
     parsave(sprintf('states/states_%d', i-1), states);
     parsave(sprintf('controls/controls_%d', i-1), controls);

@@ -5,7 +5,7 @@ function [W, WVE, wellIx] = gen_wells(G, Gt, rock2D)
 % Hydrostatic boundary conditions are specified on all outer boundaries.
 
     num_wells = randi([1,5]);
-    wellIx    = randi(G.cartDims(1), [num_wells, 2]);
+    wellIx    = randi([16,144], [num_wells, 2]);
 
     rock = rock2D.parent;
 
@@ -13,7 +13,7 @@ function [W, WVE, wellIx] = gen_wells(G, Gt, rock2D)
 
     W = [];
     for i=1:num_wells
-        W = verticalWell(W, G, rock, wellIx(i,1), wellIx(i,2), 5, ...
+        W = verticalWell(W, G, rock, wellIx(i,1), wellIx(i,2), G.cartDims(3), ...
                          'InnerProduct' , 'ip_simple' , ...
                          'Type'         , 'rate'      , ...
                          'Sign'         , 1           , ...
