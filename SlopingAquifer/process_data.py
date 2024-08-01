@@ -7,21 +7,12 @@ from multiprocessing import Pool
 from skimage.transform import resize
 from sklearn.preprocessing import MinMaxScaler
 
-NT, NT0    = 60, 30
-NX, NY, NZ = 160, 160, 5
-DX, DY, DZ = 250, 250, 40
-sec2year   = 365.25 * 24 * 60 * 60
+NX, NY, NZ, NT = 160, 160, 5, 60
 psi2pascal = 6894.76
-co2_rho    = 686.5266
-mega       = 1e6
-mt2m3      = sec2year*co2_rho/mega/1e3
 
 n_realiations = 318
 n_slices = 4
 slice1, slice2, slice3, slice4 = 26, 55, 75, 102
-
-gridVE = sio.loadmat('Gt.mat', simplify_cells=True)['Gt']
-tops2d = -gridVE['cells']['z'].reshape(NX,NY)
 
 fnames = []
 for root, dirs, files in os.walk('/mnt/e/MLTrainingImages'):
@@ -94,36 +85,6 @@ def process_states(i):
         saturation[j] = dd[j]['s'].reshape(NX,NY)
     np.save('states/pressure/pressure_{}.npy'.format(i), pressure)
     np.save('states/saturation/saturation_{}.npy'.format(i), saturation)
-
-def process_data(i):
-    tops = np.repeat(np.expand_dims(tops2d, -1), NT0, axis=-1)
-    rock = np.load('rock/VE2d/npz/rock2d_{}.npz'.format(i))
-    perm = np.repeat(np.expand_dims(rock['perm'].reshape(NX,NY), -1), NT0, axis=-1)
-    poro = np.repeat(np.expand_dims(rock['poro'].reshape(NX,NY), -1), NT0, axis=-1)
-    rock.close()
-
-    pressure   = np.moveaxis(np.load('states/pressure/pressure_{}.npy'.format(i)), 0, -1)
-    saturation = np.moveaxis(np.load('states/saturation/saturation_{}.npy'.format(i)), 0, -1)
-
-    ww = sio.loadmat('well_locs/well_locs_{}.mat'.format(i), simplify_cells=True)['var'] - 1
-    cc = sio.loadmat('controls/controls_{}.mat'.format(i), simplify_cells=True)['var'] * sec2year * co2_rho / 1e3 / mega
-
-    if len(cc.shape) == 1:
-        cc = cc.reshape(1, -1)
-    if len(ww.shape) == 1:
-        ww = ww.reshape(1, -1)
-
-    well_locs = np.zeros((NX,NY))
-    well_locs[ww[:,1], ww[:,0]] = 1
-    well_locs = np.repeat(np.expand_dims(well_locs, -1), NT0, axis=-1)
-
-    controls = np.zeros((NX,NY,NT0))
-    controls[ww[:,1], ww[:,0], :] = cc
-
-    features = np.stack([poro, perm, tops, well_locs, controls], axis=0)
-    labels = np.stack([pressure, saturation], axis=0)
-
-    np.savez('data/realiation_{}.npz'.format(i), features=features, labels1=labels[...,:NT0], labels2=labels[...,NT0:])
 
 def run_parallel_processing(iterations, num_processes):
     with Pool(processes=num_processes) as pool:
