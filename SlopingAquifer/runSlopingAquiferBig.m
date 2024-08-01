@@ -2,7 +2,8 @@
 % Set time parameters:
 % Inject CO2 for 100 years and study subsequent migration for 1500 years
 % until 1600 years after injection started. 
-% Steps: inj=10, migration=30.
+% Steps: inj=10, migra
+% tion=30.
 % Max injection: 20 MT CO2 per year per well
 % The fluid data are chosen so that they are resonable at p = 300 bar
 % timesteps = [T, stopInj, dT, dT2]
@@ -43,6 +44,7 @@ parfor (i=1:1272)
     parsave(sprintf('states/states_%d', i-1), states);
     parsave(sprintf('controls/controls_%d', i-1), controls);
     parsave(sprintf('well_locs/well_locs_%d', i-1), wellIx);
+    parsave(sprintf('rock/VE2d/rock2d_%d', i-1), rock2D);
     fprintf('Simulation %i done\n', i-1)
 
 end

@@ -1,32 +1,24 @@
 paper/*
 data/*
 
-synthetic2D/facies/*
-synthetic2D/permeability/*
-synthetic2D/porosity/*
-synthetic2D/pressure/*
-synthetic2D/saturation/*
-synthetic2D/states/*
-synthetic2D/wells/*
-synthetic2D/input_features/*
-synthetic2D/output_targets/*
+synthetic2D/**/*.mat
+synthetic2D/**/*.npy
+synthetic2D/**/*.npz
 
 optim_placement/simulations/pressure.mat
 optim_placement/data_mat/results.mat
 
+Johansen/**/*.mat
+Johansen/**/*.npy
+Johansen/**/*.npz
 Johansen/data/*
 Johansen/data_100_100_11/perm_1000.csv
 Johansen/data_100_100_11/perm_272.csv
-Johansen/data_100_100_11/*/*.mat
-Johansen/data_100_100_11/*/*.npy
-Johansen/data_npy_100_100_11/*/*.npz
 
 MiONet.pth
 FTMioNet.pth
 
-SlopingAquifer/rock/*
-SlopingAquifer/facies/*
-SlopingAquifer/states/*
-SlopingAquifer/well_locs/*
-SlopingAquifer/controls/*
+SlopingAquifer/**/*.mat
+SlopingAquifer/**/*.npy
+SlopingAquifer/**/*.npz
 SlopingAquifer/rock/perm_160x160x5_n159_b*
