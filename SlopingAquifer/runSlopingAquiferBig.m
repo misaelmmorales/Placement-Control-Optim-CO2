@@ -29,8 +29,10 @@ total_inj = (2000/30); % in MT CO2 ==> 2 GT over 30 years
 min_inj   = 3; % in MT CO2
 
 %% Main loop
-parfor i=1:1272   
-    [rock, rock2D]       = gen_rock(G, Gt, i);
+parpool(8)
+
+parfor (i=1:1272)
+    [rock, rock2D]       = gen_rock(G, Gt, i-1);
     [W, WVE, wellIx]     = gen_wells(G, Gt, rock2D);
     [controls]           = gen_controls(timesteps, total_inj, min_inj, W, fluidVE);
     [SVE, preComp, sol0] = gen_init(Gt, rock2D, fluidVE, W, p_init);
@@ -41,7 +43,7 @@ parfor i=1:1272
     parsave(sprintf('states/states_%d', i-1), states);
     parsave(sprintf('controls/controls_%d', i-1), controls);
     parsave(sprintf('well_locs/well_locs_%d', i-1), wellIx);
-    fprintf('Simulation %i done\n', i)
+    fprintf('Simulation %i done\n', i-1)
 
 end
 
