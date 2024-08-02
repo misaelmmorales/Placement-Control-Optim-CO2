@@ -1,15 +1,31 @@
+import os
+import numpy as np
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from torch.utils.data import Dataset
+
+class CustomDataset(Dataset):
+    def __init__(self, nt0=30):
+        self.nfeatures = os.listdir('data/features')
+        self.nt0 = nt0
+
+    def __len__(self):
+        return len(self.nfeatures)
+
+    def __getitem__(self, idx):
+        self.features = np.load('data/features/features_{}.npy'.format(idx))
+        self.targets  = np.load('data/targets/targets_{}.npy'.format(idx))
+        self.targets1 = self.targets[..., :self.nt0]
+        self.targets2 = self.targets[-1, ..., self.nt0:]
+        return self.features, self.targets1, self.targets2
 
 class LpLoss(object):
-    """this class has been copied from: https://github.com/gegewen/ufno"""
     def __init__(self, d=2, p=2, size_average=True, reduction=True):
         super(LpLoss, self).__init__()
-
         #Dimension and Lp-norm type are postive
         assert d > 0 and p > 0
-
         self.d = d
         self.p = p
         self.reduction = reduction
@@ -17,16 +33,13 @@ class LpLoss(object):
 
     def rel(self, x, y):
         num_examples = x.size()[0]
-
         diff_norms = torch.norm(x.reshape(num_examples,-1) - y.reshape(num_examples,-1), self.p, 1)
         y_norms = torch.norm(y.reshape(num_examples,-1), self.p, 1)
-
         if self.reduction:
             if self.size_average:
                 return torch.mean(diff_norms/y_norms)
             else:
                 return torch.sum(diff_norms/y_norms)
-
         return diff_norms/y_norms
 
     def __call__(self, x, y):

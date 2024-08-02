@@ -7,12 +7,22 @@ from multiprocessing import Pool
 from skimage.transform import resize
 from sklearn.preprocessing import MinMaxScaler
 
-NX, NY, NZ, NT = 160, 160, 5, 60
+NT, NT0    = 60, 30
+NX, NY, NZ = 160, 160, 5
+DX, DY, DZ = 250, 250, 40
+PARENT_DIR = '/mnt/e/Placement-Control-Optim-CO2'
+LOCAL_DIR  = 'SlopingAquifer'
+sec2year   = 365.25 * 24 * 60 * 60
 psi2pascal = 6894.76
+co2_rho    = 686.5266
+mega       = 1e6
+mt2m3      = sec2year*co2_rho/mega/1e3
 
-n_realiations = 318
-n_slices = 4
+n_realiations, n_slices = 318, 4
 slice1, slice2, slice3, slice4 = 26, 55, 75, 102
+
+gridVE = sio.loadmat('Gt.mat', simplify_cells=True)['Gt']
+tops2d = -gridVE['cells']['z'].reshape(NX,NY)
 
 fnames = []
 for root, dirs, files in os.walk('/mnt/e/MLTrainingImages'):
@@ -96,3 +106,37 @@ run_parallel_processing(iterations, num_processes=8)
 print('-'*50)
 print(' '*23, 'Done', ' '*23)
 print('-'*50)
+
+for i in tqdm(range(1272), desc='Processing data'):
+    tops = np.repeat(np.expand_dims(tops2d, -1), NT0, axis=-1)
+    rock = sio.loadmat('rock/VE2d/mat/rock2d_{}.mat'.format(i), simplify_cells=True)['var']
+    perm = np.repeat(np.expand_dims(rock['perm'].reshape(NX,NY), -1), NT0, axis=-1)
+    poro = np.repeat(np.expand_dims(rock['poro'].reshape(NX,NY), -1), NT0, axis=-1)
+
+    ww = sio.loadmat('well_locs/well_locs_{}.mat'.format(i), simplify_cells=True)['var'] - 1
+    cc = sio.loadmat('controls/controls_{}.mat'.format(i), simplify_cells=True)['var'] * sec2year * co2_rho / 1e3 / mega
+
+    if len(cc.shape) == 1:
+        cc = cc.reshape(1, -1)
+    if len(ww.shape) == 1:
+        ww = ww.reshape(1, -1)
+
+    well_locs = np.zeros((NX,NY))
+    well_locs[ww[:,1], ww[:,0]] = 1
+    well_locs = np.repeat(np.expand_dims(well_locs, -1), NT0, axis=-1)
+
+    controls = np.zeros((NX,NY,NT0))
+    controls[ww[:,1], ww[:,0], :] = cc
+
+    pressure = np.zeros((NX,NY,NT))
+    saturation = np.zeros((NX,NY,NT))
+    dd = sio.loadmat('states/states_{}.mat'.format(i), simplify_cells=True)['var']
+    for j in range(NT):
+        pressure[..., j] = dd[j]['pressure'].reshape(NX,NY)
+        saturation[..., j] = dd[j]['s'].reshape(NX,NY)
+
+    features = np.stack([poro, perm, tops, well_locs, controls], axis=0)
+    targets = np.stack([pressure, saturation], axis=0)
+
+    np.save('data/features/features_{}.npy'.format(i), features)
+    np.save('data/targets/targets_{}.npy'.format(i), targets)
