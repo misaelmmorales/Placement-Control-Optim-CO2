@@ -22,3 +22,7 @@ SlopingAquifer/**/*.mat
 SlopingAquifer/**/*.npy
 SlopingAquifer/**/*.npz
 SlopingAquifer/rock/perm_160x160x5_n159_b*
+
+SlopingAquiferSmall/**/*.mat
+SlopingAquiferSmall/**/*.npy
+SlopingAquiferSmall/**/*.csv
