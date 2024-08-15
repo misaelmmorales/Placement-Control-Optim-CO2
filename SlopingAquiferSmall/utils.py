@@ -71,6 +71,38 @@ class CustomLoss(nn.Module):
         
         return self.alpha * reconstruction + (1-self.alpha) * perceptual
     
+class DualCustomLoss(nn.Module):
+    def __init__(self, alpha=0.85, beta=0.80, gamma=0.80):
+        super(DualCustomLoss, self).__init__()
+        self.alpha = alpha
+        self.beta  = beta
+        self.gamma = gamma
+        self.mseloss = nn.MSELoss()
+        self.maeloss = nn.L1Loss()
+        self.ssimloss = SSIMLoss()
+        self.psnrloss = PSNRLoss()
+
+    def forward(self, y1_true, y2_true, y1_pred, y2_pred):
+        # injection period
+        mse1 = self.mseloss(y1_pred, y1_true)
+        mae1 = self.maeloss(y1_pred, y1_true)
+        reconstruction1 = self.beta * mse1 + (1 - self.beta) * mae1
+        ssim1 = 1 - self.ssimloss(y1_pred, y1_true)
+        psnr1 = 1 / self.psnrloss(y1_pred, y1_true)
+        perceptual1 = self.gamma * ssim1 + (1 - self.gamma) * psnr1
+        loss1 = self.alpha * reconstruction1 + (1 - self.alpha) * perceptual1
+
+        # monitor period
+        mse2 = self.mseloss(y2_pred, y2_true)
+        mae2 = self.maeloss(y2_pred, y2_true)
+        reconstruction2 = self.beta * mse2 + (1 - self.beta) * mae2
+        ssim2 = 1 - self.ssimloss(y2_pred, y2_true)
+        psnr2 = 1 / self.psnrloss(y2_pred, y2_true)
+        perceptual2 = self.gamma * ssim2 + (1 - self.gamma) * psnr2
+        loss2 = self.alpha * reconstruction2 + (1 - self.alpha) * perceptual2
+
+        return (loss1 + loss2) / 2
+    
 class LpLoss(nn.Module):
     def __init__(self, d=2, p=2, size_average=True, reduction=True):
         super(LpLoss, self).__init__()
@@ -94,6 +126,17 @@ class LpLoss(nn.Module):
 
     def forward(self, x, y):
         return self.rel(x, y)
+    
+class DualLpLoss(nn.Module):
+    def __init__(self, alpha=0.5, d=2, p=2, size_average=True, reduction=True):
+        super(DualLpLoss, self).__init__()
+        self.loss = LpLoss(d=d, p=p, size_average=size_average, reduction=reduction)
+        self.alpha = alpha
+
+    def forward(self, y1_true, y2_true, y1_pred, y2_pred):
+        loss1 = self.loss(y1_true, y1_pred)
+        loss2 = self.loss(y2_true, y2_pred)
+        return self.alpha * loss1 + (1-self.alpha) * loss2
 
 class SqueezeExcite(nn.Module):
     def __init__(self, channels, ratio=4):
@@ -115,12 +158,12 @@ class SqueezeExcite(nn.Module):
         return a
     
 class EncoderLayer(nn.Module):
-    def __init__(self, in_channels, out_channels, n_modes=(10,10), num_layers=1, kernel_size=(3,3), stride=1, padding=1):
+    def __init__(self, in_channels, out_channels, n_modes=(10,10), num_layers=1, kernel_size=(3,3), stride=1, padding=1, device='cpu'):
         super(EncoderLayer, self).__init__()
         #self.conv = nn.Conv2d(in_channels, out_channels, kernel_size, stride, padding, groups=in_channels)
-        self.conv = SpectralConv(in_channels, out_channels, n_modes, n_layers=num_layers)
+        self.conv = SpectralConv(in_channels, out_channels, n_modes, n_layers=num_layers).to(device)
         self.saex = SqueezeExcite(out_channels)
-        self.norm = nn.GroupNorm(out_channels, out_channels)
+        self.norm = nn.GroupNorm(out_channels, out_channels, device=device)
         self.actv = nn.GELU()
         self.pool = nn.MaxPool2d(kernel_size=(2,2), stride=2)
 
@@ -159,25 +202,27 @@ class DecoderLayer(nn.Module):
             x = self.norm(x)
             x = self.actv(x)
         return x.permute(0,4,1,2,3) # (b,c,h,w,t) -> (b,t,c,h,w)
-    
+
 class NeuralPix2Vid(nn.Module):
     def __init__(self, in_channels:int=4, out_channels_1:int=2, out_channels_2:int=1, c_channels:int=5, 
-                 n_timesteps:int=30, c_nonlinearity=F.gelu, hidden_channels=[64,256,512], device='cpu'):
+                 n_timesteps:int=30, c_nonlinearity=F.gelu, hidden_channels=[16,64,256], device='cpu'):
         super(NeuralPix2Vid, self).__init__()
-        self.enc1 = EncoderLayer(in_channels, hidden_channels[0])
-        self.enc2 = EncoderLayer(hidden_channels[0], hidden_channels[1])
-        self.enc3 = EncoderLayer(hidden_channels[1], hidden_channels[2])
-        self.mon1 = EncoderLayer(1, hidden_channels[0])
-        self.mon2 = EncoderLayer(hidden_channels[0], hidden_channels[1])
-        self.mon3 = EncoderLayer(hidden_channels[1], hidden_channels[2])
+        self.enc1 = EncoderLayer(in_channels,        hidden_channels[0], device=device)
+        self.enc2 = EncoderLayer(hidden_channels[0], hidden_channels[1], device=device)
+        self.enc3 = EncoderLayer(hidden_channels[1], hidden_channels[2], device=device)
+        self.mon1 = EncoderLayer(1,                  hidden_channels[0], device=device)
+        self.mon2 = EncoderLayer(hidden_channels[0], hidden_channels[1], device=device)
+        self.mon3 = EncoderLayer(hidden_channels[1], hidden_channels[2], device=device)
         self.lift = nn.Linear(c_channels, hidden_channels[2])
         self.out1 = nn.Linear(in_channels, out_channels_1)
         self.out2 = nn.Linear(in_channels, out_channels_2)
         self.cact = c_nonlinearity
         self.nt   = n_timesteps
         self.device = device
+        self.hidden_channels = hidden_channels
 
-    def cond_decoder_layer(self, inputs, controls, residuals, previous_step, hidden=[64,256,512]):
+    def cond_decoder_layer(self, inputs, controls, residuals, previous_step):
+        hidden = self.hidden_channels
         # conditional
         c = controls.view(controls.size(0), 1, controls.size(-1), 1, 1)
         x = torch.einsum('btchw, bkcpq -> btchw', inputs, c)
@@ -189,7 +234,8 @@ class NeuralPix2Vid(nn.Module):
             x = torch.cat([x, previous_step], dim=1)
         return x
     
-    def uncond_decoder_layer(self, inputs, residuals, previous_step, hidden=[64,256,512]):
+    def uncond_decoder_layer(self, inputs, residuals, previous_step):
+        hidden = self.hidden_channels
         # spatiotemporal
         x = DecoderLayer(hidden[2], hidden[1], residuals[0], device=self.device)(inputs)
         x = DecoderLayer(hidden[1], hidden[0], residuals[1], device=self.device)(x)
@@ -298,7 +344,7 @@ def fno_dataset():
 
     return (X_data, y1_data, y2_data, all_volumes, idx), (trainloader, validloader)
 
-def pix2vid_dataset():
+def pix2vid_dataset(batch_size:int=8, send_to_device:bool=False, device=None):
     # Load volumes
     v = np.load('volumes.npz')
     conversion = co2rho / 1e3 / mega
@@ -331,6 +377,14 @@ def pix2vid_dataset():
     y1t = torch.tensor(y1_norm, dtype=torch.float32)
     y2t = torch.tensor(y2_norm, dtype=torch.float32)
 
+    # Send to device
+    if send_to_device == True:
+        assert device is not None, 'Please provide a device'
+        Xt = Xt.to(device)
+        ct = ct.to(device)
+        y1t = y1t.to(device)
+        y2t = y2t.to(device)
+
     idx = np.random.choice(range(NR), NR, replace=False)
     train_idx, valid_idx, test_idx= idx[:1000], idx[1000:1136], idx[1136:]
     X_train, c_train, y1_train, y2_train = Xt[train_idx], ct[train_idx], y1t[train_idx], y2t[train_idx]
@@ -346,7 +400,7 @@ def pix2vid_dataset():
     print('Test  - X:  {}     | c:  {}'.format(X_test.shape, c_test.shape))
     print('        y1: {} | y2: {}'.format(y1_test.shape, y2_test.shape))
 
-    trainloader = DataLoader(TensorDataset(X_train, y1_train), batch_size=8, shuffle=True)
-    validloader = DataLoader(TensorDataset(X_valid, y1_valid), batch_size=8, shuffle=False)
+    trainloader = DataLoader(TensorDataset(X_train, c_train, y1_train, y2_train), batch_size=batch_size, shuffle=True)
+    validloader = DataLoader(TensorDataset(X_valid, c_valid, y1_valid, y2_valid), batch_size=batch_size, shuffle=False)
 
     return (Xt, ct, y1t, y2t, all_volumes, idx), (trainloader, validloader)
