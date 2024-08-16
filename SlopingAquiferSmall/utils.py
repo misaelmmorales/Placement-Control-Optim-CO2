@@ -13,7 +13,7 @@ from neuralop.models import FNO
 from neuralop.layers.spectral_convolution import SpectralConv
 from convlstm import ConvLSTM
 
-NR, NT = 1272, 20
+NR, NT = 1272, 40
 NX, NY = 40, 40
 milli  = 1e-3
 mega   = 1e6
@@ -22,8 +22,22 @@ psi2pa = 6894.75729
 co2rho = 686.5400
 sec2yr = 1/(3600*24*365.25)
 
-fno = FNO(n_modes=((10,10,10)), n_layers=4, use_mlp=True,
+fno = FNO(n_modes=((10,10,5)), n_layers=4, use_mlp=True,
           in_channels=5, lifting_channels=64, hidden_channels=64, projection_channels=64, out_channels=2)
+
+class Units:
+    def __init__(self):
+        self.centi = 1e-2
+        self.milli = 1e-3
+        self.micro = 1e-6
+        self.nano = 1e-9
+        self.giga = 1e9
+        self.mega = 1e6
+        self.kilo = 1e3
+        self.Darcy = 9.869233e-13
+        self.psi2pa = 6894.75729
+        self.co2rho = 686.5400
+        self.sec2yr = 1/(3600*24*365.25)
 
 def check_torch(verbose:bool=True):
     if torch.cuda.is_available():
@@ -176,7 +190,7 @@ class EncoderLayer(nn.Module):
         return x
     
 class DecoderLayer(nn.Module):
-    def __init__(self, in_channels, out_channels, residual=None, n_modes=(10,10,10), 
+    def __init__(self, in_channels, out_channels, residual=None, n_modes=(10,10,5), 
                  kernel_size:list=[3,3], stride=1, padding=1, num_layers=1, 
                  batch_first=True, bias=True, return_all_layers=False, device='cpu'):
         super(DecoderLayer, self).__init__()
@@ -205,7 +219,7 @@ class DecoderLayer(nn.Module):
 
 class NeuralPix2Vid(nn.Module):
     def __init__(self, in_channels:int=4, out_channels_1:int=2, out_channels_2:int=1, c_channels:int=5, 
-                 n_timesteps:int=30, c_nonlinearity=F.gelu, hidden_channels=[16,64,256], device='cpu'):
+                 n_timesteps:int=NT//2, c_nonlinearity=F.gelu, hidden_channels=[16,64,256], device='cpu'):
         super(NeuralPix2Vid, self).__init__()
         self.enc1 = EncoderLayer(in_channels,        hidden_channels[0], device=device)
         self.enc2 = EncoderLayer(hidden_channels[0], hidden_channels[1], device=device)
@@ -357,25 +371,23 @@ def pix2vid_dataset(folder:str='simulations_40x40', batch_size:int=8, send_to_de
 
     # Load data
     X_data  = np.load('{}/X_data.npy'.format(folder))
-    c_data  = np.load('{}/c_data.npy'.format(folder)) * co2rho
+    c_data  = np.load('{}/c_data.npy'.format(folder))
     y1_data = np.load('{}/y1_data.npy'.format(folder))
     y2_data = np.load('{}/y2_data.npy'.format(folder))
+    print('X: {} | c: {} | y1: {} | y2: {}'.format(X_data.shape, c_data.shape, y1_data.shape, y2_data.shape))
 
     # Normalize data
     X_data[:,0] = X_data[:,0] / 0.37
-    X_data[:,1] = X_data[:,1] / 3.3
-    X_data[:,2] = (X_data[:,2]-900) / (1042 - 900)
-    c_data = c_data / 10
-    y1_data[:,0] = y1_data[:,0] / 1e4
+    X_data[:,1] = X_data[:,1] / 3.4
+    X_data[:,2] = (X_data[:,2] - X_data[:,2].min()) / (X_data[:,2].max() - X_data[:,2].min())
+    c_data = c_data / 7
+    y1_data[:,:,0] = y1_data[:,:,0] / 1e4
 
-    # Reshape data
-    X_norm  = np.moveaxis(X_data, -1, 1)
-    y1_norm = np.moveaxis(y1_data, -1, 2)
-    y2_norm = np.moveaxis(y2_data, -1, 2)
-    Xt  = torch.tensor(X_norm, dtype=torch.float32)
-    ct  = torch.tensor(c_data, dtype=torch.float32)
-    y1t = torch.tensor(y1_norm, dtype=torch.float32)
-    y2t = torch.tensor(y2_norm, dtype=torch.float32)
+    # Tensorize data
+    Xt = torch.tensor(X_data, dtype=torch.float32)
+    ct = torch.tensor(c_data, dtype=torch.float32)
+    y1t = torch.tensor(y1_data, dtype=torch.float32)
+    y2t = torch.tensor(y2_data, dtype=torch.float32)
 
     # Send to device
     if send_to_device == True:
@@ -385,12 +397,13 @@ def pix2vid_dataset(folder:str='simulations_40x40', batch_size:int=8, send_to_de
         y1t = y1t.to(device)
         y2t = y2t.to(device)
 
+    # Split and DataLoader
     idx = np.random.choice(range(NR), NR, replace=False)
     train_idx, valid_idx, test_idx= idx[:1000], idx[1000:1136], idx[1136:]
     X_train, c_train, y1_train, y2_train = Xt[train_idx], ct[train_idx], y1t[train_idx], y2t[train_idx]
     X_valid, c_valid, y1_valid, y2_valid = Xt[valid_idx], ct[valid_idx], y1t[valid_idx], y2t[valid_idx]
     X_test,  c_test,  y1_test,  y2_test  = Xt[test_idx],  ct[test_idx],  y1t[test_idx],  y2t[test_idx]
-
+    print('-'*100)
     print('Train - X:  {}     | c:  {}'.format(X_train.shape, c_train.shape))
     print('        y1: {} | y2: {}'.format(y1_train.shape, y2_train.shape))
     print('-'*20)
