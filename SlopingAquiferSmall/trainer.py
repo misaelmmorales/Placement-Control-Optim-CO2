@@ -1,12 +1,14 @@
 import numpy as np
 import pandas as pd
-from time import time
 import matplotlib.pyplot as plt
+
 import scipy.io as sio
+from time import time
+
 import torch
-import torch.nn as nn
 import torch.optim as optim
-from utils import Units, check_torch, pix2vid_dataset, DualCustomLoss, DualLpLoss, NeuralPix2Vid
+from utils import Units, check_torch, pix2vid_dataset
+from utils import NeuralPix2Vid, DualCustomLoss, DualLpLoss
 
 NR, NT = 1272, 40
 NX, NY = 40, 40
@@ -30,12 +32,12 @@ print('tops2d: {}'.format(tops2d.shape))
 model = NeuralPix2Vid(device=device).to(device)
 nparams = sum(p.numel() for p in model.parameters() if p.requires_grad)
 print('# parameters: {:,} | device: {}'.format(nparams, model.device))
-#criterion = DualLpLoss().to(device)
-criterion = DualCustomLoss().to(device)
+criterion = DualCustomLoss().to(device) # DualLpLoss().to(device)
 optimizer = optim.Adam(model.parameters(), lr=1e-3, weight_decay=1e-6)
 
 start = time()
 epochs, monitor = 200, 5
+tolerance = 0.01
 train_loss, valid_loss = [], []
 for epoch in range(epochs):
     epoch_train_loss = []
@@ -60,11 +62,17 @@ for epoch in range(epochs):
     # progress
     if (epoch+1) % monitor == 0:
         print('Epoch: [{}/{}] | Train Loss: {:.5f} | Valid Loss: {:.5f}'.format(epoch+1, epochs, train_loss[-1], valid_loss[-1]))
+    # early stopping
+    percent_change = (valid_loss[-2] - valid_loss[-1]) / valid_loss[-2]
+    if epoch > 0 and percent_change < tolerance:
+        print('Early stopping at epoch: {}'.format(epoch+1))
+        break
 
-print('Total training time: {:.3f} minuts'.format((time()-start)/60))
+traintime = time()-start
 torch.save(model.state_dict(), 'neural-pix2vid_model.pth')
 losses = pd.DataFrame({'train': train_loss, 'valid': valid_loss})
 losses.to_csv('neural-pix2vid_losses.csv', index=False)
+print('Total training time: {:.3f} minutes'.format(traintime/60))
 
 plt.figure(figsize=(12,6))
 plt.plot(losses.index, losses['train'], label='Train')
