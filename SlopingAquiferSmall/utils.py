@@ -101,20 +101,26 @@ class DualCustomLoss(nn.Module):
         mse1 = self.mseloss(y1_pred, y1_true)
         mae1 = self.maeloss(y1_pred, y1_true)
         reconstruction1 = self.beta * mse1 + (1 - self.beta) * mae1
-        ssim1 = 1 - self.ssimloss(y1_pred, y1_true)
-        psnr1 = 1 / self.psnrloss(y1_pred, y1_true)
+
+        p1 = y1_true.permute(0,2,3,4,1)
+        q1 = y1_pred.permute(0,2,3,4,1)
+        ssim1 = 1 - self.ssimloss(p1, q1)
+        psnr1 = 1 / self.psnrloss(p1, q1)
         perceptual1 = self.gamma * ssim1 + (1 - self.gamma) * psnr1
-        loss1 = self.alpha * reconstruction1 + (1 - self.alpha) * perceptual1
 
         # monitor period
         mse2 = self.mseloss(y2_pred, y2_true)
         mae2 = self.maeloss(y2_pred, y2_true)
         reconstruction2 = self.beta * mse2 + (1 - self.beta) * mae2
-        ssim2 = 1 - self.ssimloss(y2_pred, y2_true)
-        psnr2 = 1 / self.psnrloss(y2_pred, y2_true)
-        perceptual2 = self.gamma * ssim2 + (1 - self.gamma) * psnr2
-        loss2 = self.alpha * reconstruction2 + (1 - self.alpha) * perceptual2
 
+        p2 = y2_true.permute(0,2,3,4,1)
+        q2 = y2_pred.permute(0,2,3,4,1)
+        ssim2 = 1 - self.ssimloss(p2, q2)
+        psnr2 = 1 / self.psnrloss(p2, q2)
+        perceptual2 = self.gamma * ssim2 + (1 - self.gamma) * psnr2
+
+        loss1 = self.alpha * reconstruction1 + (1 - self.alpha) * perceptual1
+        loss2 = self.alpha * reconstruction2 + (1 - self.alpha) * perceptual2
         return (loss1 + loss2) / 2
     
 class LpLoss(nn.Module):
