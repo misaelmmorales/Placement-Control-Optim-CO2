@@ -1,11 +1,12 @@
 import numpy as np
 from tqdm import tqdm
+from sklearn.metrics import r2_score
+from skimage.metrics import mean_squared_error, structural_similarity, peak_signal_noise_ratio
 
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.utils.data import DataLoader, TensorDataset
-
 from torchmetrics.image import StructuralSimilarityIndexMeasure as SSIMLoss
 from torchmetrics.image import PeakSignalNoiseRatio as PSNRLoss
 
@@ -62,6 +63,28 @@ def check_torch(verbose:bool=True):
             print('Torch device: {}'.format(device))
             print('-'*60)
         return device
+    
+def calculate_metrics(y1, y2, u1, u2, data_range=1):
+    p1, s1, s2 = y1[:,:,0], y1[:,:,1], y2[:,:,-1]
+    q1, z1, z2 = u1[:,:,0], u1[:,:,1], u2[:,:,-1]
+    r2p = r2_score(p1.reshape(p1.shape[0],-1), q1.reshape(q1.shape[0],-1))
+    r2s = r2_score(s1.reshape(s1.shape[0],-1), z1.reshape(z1.shape[0],-1))
+    r2m = r2_score(s2.reshape(s2.shape[0],-1), z2.reshape(z2.shape[0],-1))
+    mse_p = mean_squared_error(p1, q1)
+    mse_s = mean_squared_error(s1, z1)
+    mse_m = mean_squared_error(s2, z2)
+    ssim_p = structural_similarity(p1, q1, data_range=data_range)
+    ssim_s = structural_similarity(s1, z1, data_range=data_range)
+    ssim_m = structural_similarity(s2, z2, data_range=data_range)
+    psnr_p = peak_signal_noise_ratio(p1, q1, data_range=data_range)
+    psnr_s = peak_signal_noise_ratio(s1, z1, data_range=data_range)
+    psnr_m = peak_signal_noise_ratio(s2, z2, data_range=data_range)
+    print('-'*81+'\n'+'-'*36+' METRICS '+'-'*36+'\n'+'-'*81)
+    print('R2   - pressure: {:.4f} | saturation (inj): {:.4f} | saturation (monitor): {:.4f}'.format(r2p, r2s, r2m))
+    print('MSE  - pressure: {:.4f} | saturation (inj): {:.4f} | saturation (monitor): {:.4f}'.format(mse_p, mse_s, mse_m))
+    print('SSIM - pressure: {:.4f} | saturation (inj): {:.4f} | saturation (monitor): {:.4f}'.format(ssim_p, ssim_s, ssim_m))
+    print('PSNR - pressure: {:.4f} | saturation (inj): {:.4f} | saturation (monitor): {:.4f}'.format(psnr_p, psnr_s, psnr_m))
+    print('-'*81)
     
 class CustomLoss(nn.Module):
     def __init__(self, alpha=0.85, beta=0.80, gamma=0.80):
@@ -364,7 +387,8 @@ def fno_dataset():
 
     return (X_data, y1_data, y2_data, all_volumes, idx), (trainloader, validloader)
 
-def pix2vid_dataset(folder:str='simulations_40x40', batch_size:int=8, send_to_device:bool=False, device=None):
+def pix2vid_dataset(folder:str='simulations_40x40', idx=None, batch_size:int=8, 
+                    normalize:bool=True, tensorize:bool=True, send_to_device:bool=False, device=None):
     # Load volumes
     v = np.load('{}/volumes.npz'.format(folder))
     conversion = co2rho / 1e3 / mega
@@ -383,20 +407,23 @@ def pix2vid_dataset(folder:str='simulations_40x40', batch_size:int=8, send_to_de
     print('X: {} | c: {} | y1: {} | y2: {}'.format(X_data.shape, c_data.shape, y1_data.shape, y2_data.shape))
 
     # Normalize data
-    X_data[:,0] = X_data[:,0] / 0.37
-    X_data[:,1] = X_data[:,1] / 3.4
-    X_data[:,2] = (X_data[:,2] - X_data[:,2].min()) / (X_data[:,2].max() - X_data[:,2].min())
-    c_data = c_data / 7
-    y1_data[:,:,0] = y1_data[:,:,0] / 1e4
+    if normalize:
+        X_data[:,0] = X_data[:,0] / 0.37
+        X_data[:,1] = X_data[:,1] / 3.4
+        X_data[:,2] = (X_data[:,2] - X_data[:,2].min()) / (X_data[:,2].max() - X_data[:,2].min())
+        c_data = c_data / 7
+        y1_data[:,:,0] = y1_data[:,:,0] / 1e4
 
     # Tensorize data
-    Xt = torch.tensor(X_data, dtype=torch.float32)
-    ct = torch.tensor(c_data, dtype=torch.float32)
-    y1t = torch.tensor(y1_data, dtype=torch.float32)
-    y2t = torch.tensor(y2_data, dtype=torch.float32)
+    if tensorize:
+        Xt = torch.tensor(X_data, dtype=torch.float32)
+        ct = torch.tensor(c_data, dtype=torch.float32)
+        y1t = torch.tensor(y1_data, dtype=torch.float32)
+        y2t = torch.tensor(y2_data, dtype=torch.float32)
 
     # Send to device
     if send_to_device == True:
+        assert tensorize is True, 'Please tensorize the data first'
         assert device is not None, 'Please provide a device'
         Xt = Xt.to(device)
         ct = ct.to(device)
@@ -404,7 +431,11 @@ def pix2vid_dataset(folder:str='simulations_40x40', batch_size:int=8, send_to_de
         y2t = y2t.to(device)
 
     # Split and DataLoader
-    idx = np.random.choice(range(NR), NR, replace=False)
+    if idx is None:
+        idx = np.random.choice(range(NR), NR, replace=False)
+        np.save('training_idx.npy', idx)
+    else:
+        idx = np.load('training_idx.npy')
     train_idx, valid_idx, test_idx= idx[:1000], idx[1000:1136], idx[1136:]
     X_train, c_train, y1_train, y2_train = Xt[train_idx], ct[train_idx], y1t[train_idx], y2t[train_idx]
     X_valid, c_valid, y1_valid, y2_valid = Xt[valid_idx], ct[valid_idx], y1t[valid_idx], y2t[valid_idx]
