@@ -13,8 +13,8 @@ from neuralop.models import FNO
 from neuralop.layers.spectral_convolution import SpectralConv
 from convlstm import ConvLSTM
 
-NR, NT = 1272, 20
-NX, NY = 40, 40
+NR, NT = 1272, 60
+NX, NY = 64, 64
 milli  = 1e-3
 mega   = 1e6
 Darcy  = 9.869233e-13
@@ -344,9 +344,9 @@ def fno_dataset():
 
     return (X_data, y1_data, y2_data, all_volumes, idx), (trainloader, validloader)
 
-def pix2vid_dataset(folder:str='simulations_40x40', batch_size:int=8, send_to_device:bool=False, device=None):
+def pix2vid_dataset(batch_size:int=8, send_to_device:bool=False, device=None):
     # Load volumes
-    v = np.load('{}/volumes.npz'.format(folder))
+    v = np.load('volumes.npz')
     conversion = co2rho / 1e3 / mega
     freeVol    = v['freeVol']    * conversion
     trappedVol = v['trappedVol'] * conversion
@@ -356,17 +356,17 @@ def pix2vid_dataset(folder:str='simulations_40x40', batch_size:int=8, send_to_de
     all_volumes = {'free': freeVol, 'trapped': trappedVol, 'leaked': leakedVol, 'total': totVol}
 
     # Load data
-    X_data  = np.load('{}/X_data.npy'.format(folder))
-    c_data  = np.load('{}/c_data.npy'.format(folder)) * co2rho
-    y1_data = np.load('{}/y1_data.npy'.format(folder))
-    y2_data = np.load('{}/y2_data.npy'.format(folder))
+    X_data  = np.load('X_data.npy')
+    c_data  = np.load('c_data.npy') * co2rho
+    y1_data = np.load('y1_data.npy')
+    y2_data = np.load('y2_data.npy')
 
     # Normalize data
-    X_data[:,0] = X_data[:,0] / 0.37
-    X_data[:,1] = X_data[:,1] / 3.3
-    X_data[:,2] = (X_data[:,2]-900) / (1042 - 900)
+    X_data[...,0] = X_data[...,0] / 0.27
+    X_data[...,1] = X_data[...,1] / 3.3
+    X_data[...,2] = (X_data[...,2]-900) / (1042 - 900)
     c_data = c_data / 10
-    y1_data[:,0] = y1_data[:,0] / 1e4
+    y1_data[...,0] = y1_data[...,0] / 1e4
 
     # Reshape data
     X_norm  = np.moveaxis(X_data, -1, 1)
