@@ -1,59 +1,50 @@
 %% VE-incomp: Sloping Aquifer Small
-% Set time parameters:
-% The fluid data are chosen so that they are resonable at p = 300 bar
-% timesteps = [T, stopInj, dT, dT2]
-mrstModule add co2lab-common co2lab-spillpoint co2lab-legacy
-mrstModule add ad-core ad-props ad-blackoil co2lab coarsegrid upscaling
-mrstModule add mimetic matlab_bgl mrst-gui
-set(0,'DefaultFigureWindowStyle','docked')
+mrstModule add mrst-gui
+mrstModule add mimetic matlab_bgl
+mrstModule add ad-core ad-props ad-blackoil
+mrstModule add co2lab-common co2lab-spillpoint co2lab-legacy co2lab
+%set(0,'DefaultFigureWindowStyle','docked')
 clear;clc; %close all
-gravity on
-g = gravity;
+gravity on; g = gravity;
 
-[G, Gt, ~, ~, bcIx, bcIxVE] = makeModel();
-[CG, ~, ~, ~, bcIx2, ~] = makeModel2d();
+[G, Gt, ~, ~, bcIx, bcIxVE] = makeModel(20,5);
+[CG, ~, ~, ~, bcIx2, ~]     = makeModel(20,1);
 save('grids/G.mat', 'G')
 save('grids/CG.mat','CG')
 save('grids/Gt.mat', 'Gt');
 
 %% Fluid properties
-co2     = CO2props(); % load sampled tables of co2 fluid properties
-p_ref   = 30 * mega * Pascal; % choose reference pressure
-t_ref   = 94 + 273.15; % choose reference temperature, in Kelvin
-rhoc    = co2.rho(p_ref, t_ref); % co2 density at ref. press/temp
-rhow    = 1000; % density of brine corresponding to 94 degrees C and 300 bar
-cf_co2  = co2.rhoDP(p_ref, t_ref) / rhoc; % co2 compressibility
-cf_wat  = 0; % brine compressibility (zero)
-cf_rock = 4.35e-5 / barsa; % rock compressibility
-muw     = 8e-4 * Pascal * second; % brine viscosity
-muco2   = co2.mu(p_ref, t_ref) * Pascal * second; % co2 viscosity
+co2     = CO2props();                            % load sampled tables of co2 fluid props
+p_ref   = 30 * mega * Pascal;                    % choose reference pressure
+t_ref   = 94 + 273.15;                           % choose reference temp [Kelvin]
+rhoc    = co2.rho(p_ref,t_ref);                  % co2 density at ref. press/temp
+rhow    = 1000;                                  % brine density at 94C, 300bar
+cf_co2  = co2.rhoDP(p_ref,t_ref) / rhoc;         % co2 compressibility
+cf_wat  = 0;                                     % brine compressibility
+cf_rock = 4.35e-5 / barsa;                       % rock compressibility
+muw     = 8e-4 * Pascal * second;                % brine viscosity
+muco2   = co2.mu(p_ref,t_ref) * Pascal * second; % co2 viscosity
 
 %% Vertical Equilibrium
 fluidVE = initVEFluidHForm(Gt, ...
-                           'mu' , [muw muco2] .* centi*poise, ...
-                           'rho', [rhoc rhow]  .* kilogram/meter^3, ...
+                           'mu' , [muw muco2] .* Pascal*second      , ...
+                           'rho', [rhoc rhow] .* kilogram/meter^3 , ...
                            'sr' , 0.20, ... %residual co2 saturation
                            'sw' , 0.27, ... %residual water saturation
                            'kwm', [0.2142 0.85]);
 ts        = findTrappingStructure(Gt);
-p_init    = Gt.cells.z * norm(gravity); % 300*barsa(); % ~ 4351 psia
+p_init    = Gt.cells.z * norm(gravity);
 
 % Boundary Conditions - VE
-bcVE   = addBC([],   bcIxVE(1:40), 'flux', 0);
-bcVE   = addBC(bcVE, bcIxVE(41:80), 'pressure', Gt.faces.z(bcIxVE(41:80))*fluidVE.rho(2)*norm(gravity));
-bcVE   = addBC(bcVE, bcIxVE(81:120), 'pressure', Gt.faces.z(bcIxVE(81:120))*fluidVE.rho(2)*norm(gravity));
-bcVE   = addBC(bcVE, bcIxVE(121:end), 'flux', 0);
+bcVE   = addBC([], bcIxVE, 'pressure', Gt.faces.z(bcIxVE)*fluidVE.rho(2)*norm(g));
 bcVE   = rmfield(bcVE,'sat');
 bcVE.h = zeros(size(bcVE.face));
 
 %% 3D initialization
 
 % Boundary Conditions - 3D
-bc = addBC([], bcIx2(1:40), 'flux', 0);
-bc = addBC(bc, bcIx2(41:80), 'pressure', G.cells.centroids(bcIx2(41:80))*fluidVE.rho(2)*norm(gravity));
-bc = addBC(bc, bcIx2(81:120), 'pressure', G.cells.centroids(bcIx2(81:120))*fluidVE.rho(2)*norm(gravity));
-bc = addBC(bc, bcIx2(121:end), 'flux', 0);
-bc = rmfield(bc, 'sat');
+pbc = fluidVE.rho(2) * norm(g) * CG.faces.centroids(bcIx2, 3);
+bc  = addBC([], bcIx2, 'pressure', pbc, 'sat', [1,0]);
 
 initState.pressure = fluidVE.rho(2) * norm(g) * CG.cells.centroids(:,3);
 initState.s        = repmat([1,0], CG.cells.num, 1);
@@ -62,43 +53,39 @@ initState.sGmax    = initState.s(:,2);
 fluid = initSimpleADIFluid('phases', 'WG'                           , ...
                            'mu'  , [fluidVE.mu(2),  fluidVE.mu(1)]  , ...
                            'rho' , [fluidVE.rho(2), fluidVE.rho(1)] , ...
-                           'pRef', p_ref            , ...
-                           'c'   , [cf_wat, cf_co2] , ...
-                           'cR'  , cf_rock          , ...
+                           'pRef', p_ref                            , ...
+                           'c'   , [cf_wat, cf_co2]                 , ...
+                           'cR'  , cf_rock                          , ...
                            'n'   , [2 2]);
-pe   = 5 * kilo * Pascal;
-pcWG = @(sw) pe * sw.^(-1/2);
+pe         = 5 * kilo * Pascal;
+pcWG       = @(sw) pe * sw.^(-1/2);
 fluid.pcWG = @(sg) pcWG(max((1-sg-fluidVE.res_water)./(1-fluidVE.res_water), 1e-5));
-fluid.krW = @(s) fluid.krW(max((s-fluidVE.res_water)./(1-fluidVE.res_water), 0));
-fluid.krG = @(s) fluid.krG(max((s-fluidVE.res_gas)./(1-fluidVE.res_gas), 0));
+fluid.krW  = @(s) fluid.krW(max((s-fluidVE.res_water)./(1-fluidVE.res_water), 0));
+fluid.krG  = @(s) fluid.krG(max((s-fluidVE.res_gas)./(1-fluidVE.res_gas), 0));
 
 %% Main loop
-timesteps = [2010*year(), 10*year(), 0.5*year(), 100*year()];
-total_inj = (25 / (timesteps(2)/year) ); % 25 MT over 10 yrs = 2.5 MT/yr
-min_inj   = 0.2; % in MT CO2
+timesteps  = [10010*year(), 10*year(), 0.5*year(), 500*year()];
+total_inj  = (25 / (timesteps(2)/year) ); % 25 MT over 10 yrs = 2.5 MT/yr
+min_inj    = 0.2; % in MT CO2
 conversion = fluidVE.rho(1) * (year/2) / 1e3 / mega;
 
 parfor (i=0:1271)
 
-    i = 1234;
     % setup
     [rock, rock2d]       = gen_rock(G, Gt, i);
     [W, W2, WVE, wellIx] = gen_wells(G, CG, Gt, rock2d);
     [controls]           = gen_controls(timesteps, total_inj, min_inj, W, fluidVE);
 
-    figure(1); clf; plotCellData(G, rock.poro); plotWell(G,W); view(-25,60); colormap jet; colorbar
-    figure(2); clf; plotCellData(CG, rock2d.poro); plotWell(CG,W2); view(-25,60); colormap jet; colorbar
-    
-
-
     % AD-3D
     [schedule]           = gen_schedule(timesteps, W2, bc, controls);
     [wellSol, states2]   = gen_ADsimulation(CG, rock2d, fluid, initState, schedule);
+
     % VE
     [SVE, preComp, sol0] = gen_init(Gt, rock2d, fluidVE, W, p_init);
     [states]             = gen_simulation(timesteps, sol0, Gt, rock2d, ...
                                           WVE, controls, fluidVE, bcVE, ...
                                           SVE, preComp, ts);
+
     % save outputs
     parsave(sprintf('states/VE2d/states_%d', i), states);
     parsave(sprintf('states/AD2d/states_%d', i), states2);
@@ -112,6 +99,22 @@ end
 disp('... All Done!');
 
 %% END
+
+%{
+bcVE = addBC([],   bcIxVE(1:40), 'flux', 0);
+bcVE = addBC(bcVE, bcIxVE(41:80), 'pressure', Gt.faces.z(bcIxVE(41:80))*fluidVE.rho(2)*norm(gravity));
+bcVE = addBC(bcVE, bcIxVE(81:120), 'pressure', Gt.faces.z(bcIxVE(81:120))*fluidVE.rho(2)*norm(gravity));
+bcVE = addBC(bcVE, bcIxVE(121:end), 'flux', 0);
+%}
+
+%{
+figure(1); clf; plotCellData(G, rock.poro); plotWell(G,W); view(-25,60); colormap jet; colorbar
+figure(2); clf; plotCellData(CG, rock2d.poro); plotWell(CG,W2); view(-25,60); colormap jet; colorbar
+figure(3); plotToolbar(CG,states2); plotWell(CG,W2); colormap jet; colorbar; view(-25,60)
+figure(4); clf; plotCellData(Gt, rock2d.poro); view(-25,60); colormap jet; colorbar
+figure(5); clf; plotToolbar(Gt, states); view(-25,60); colormap jet; colorbar
+%}
+
 %{
 free    = zeros(40,1);
 trapped = zeros(40,1);
