@@ -3,109 +3,134 @@
 % The fluid data are chosen so that they are resonable at p = 300 bar
 % timesteps = [T, stopInj, dT, dT2]
 mrstModule add co2lab-common co2lab-spillpoint co2lab-legacy
+mrstModule add ad-core ad-props ad-blackoil co2lab coarsegrid upscaling
 mrstModule add mimetic matlab_bgl mrst-gui
+set(0,'DefaultFigureWindowStyle','docked')
 clear;clc; %close all
 gravity on
+g = gravity;
 
-[G, Gt, ~, ~, bcIxVE] = makeModel();
-figure(1); clf; plotCellData(G, G.cells.centroids(:,3)); colormap jet; colorbar; view(26,15)
-save('G.mat', 'G'); save('Gt.mat', 'Gt');
+[G, Gt, ~, ~, bcIx, bcIxVE] = makeModel();
+[CG, ~, ~, ~, bcIx2, ~] = makeModel2d();
+save('grids/G.mat', 'G')
+save('grids/CG.mat','CG')
+save('grids/Gt.mat', 'Gt');
 
+%% Fluid properties
+co2     = CO2props(); % load sampled tables of co2 fluid properties
+p_ref   = 30 * mega * Pascal; % choose reference pressure
+t_ref   = 94 + 273.15; % choose reference temperature, in Kelvin
+rhoc    = co2.rho(p_ref, t_ref); % co2 density at ref. press/temp
+rhow    = 1000; % density of brine corresponding to 94 degrees C and 300 bar
+cf_co2  = co2.rhoDP(p_ref, t_ref) / rhoc; % co2 compressibility
+cf_wat  = 0; % brine compressibility (zero)
+cf_rock = 4.35e-5 / barsa; % rock compressibility
+muw     = 8e-4 * Pascal * second; % brine viscosity
+muco2   = co2.mu(p_ref, t_ref) * Pascal * second; % co2 viscosity
+
+%% Vertical Equilibrium
 fluidVE = initVEFluidHForm(Gt, ...
-                           'mu' , [0.056641 0.30860] .* centi*poise, ...
-                           'rho', [686.54   975.86]  .* kilogram/meter^3, ...
+                           'mu' , [muw muco2] .* centi*poise, ...
+                           'rho', [rhoc rhow]  .* kilogram/meter^3, ...
                            'sr' , 0.20, ... %residual co2 saturation
                            'sw' , 0.27, ... %residual water saturation
                            'kwm', [0.2142 0.85]);
 ts        = findTrappingStructure(Gt);
 p_init    = Gt.cells.z * norm(gravity); % 300*barsa(); % ~ 4351 psia
 
-% E, W, N, S
-bcVE      = addBC([],   bcIxVE(1:40), 'flux', 0);
-bcVE      = addBC(bcVE, bcIxVE(41:80), 'pressure', Gt.faces.z(bcIxVE(41:80))*fluidVE.rho(2)*norm(gravity));
-bcVE      = addBC(bcVE, bcIxVE(81:120), 'pressure', Gt.faces.z(bcIxVE(81:120))*fluidVE.rho(2)*norm(gravity));
-bcVE      = addBC(bcVE, bcIxVE(121:end), 'flux', 0);
+% Boundary Conditions - VE
+bcVE   = addBC([],   bcIxVE(1:40), 'flux', 0);
+bcVE   = addBC(bcVE, bcIxVE(41:80), 'pressure', Gt.faces.z(bcIxVE(41:80))*fluidVE.rho(2)*norm(gravity));
+bcVE   = addBC(bcVE, bcIxVE(81:120), 'pressure', Gt.faces.z(bcIxVE(81:120))*fluidVE.rho(2)*norm(gravity));
+bcVE   = addBC(bcVE, bcIxVE(121:end), 'flux', 0);
+bcVE   = rmfield(bcVE,'sat');
+bcVE.h = zeros(size(bcVE.face));
 
-bcVE      = rmfield(bcVE,'sat');
-bcVE.h    = zeros(size(bcVE.face));
+%% 3D initialization
+
+% Boundary Conditions - 3D
+bc = addBC([], bcIx2(1:40), 'flux', 0);
+bc = addBC(bc, bcIx2(41:80), 'pressure', G.cells.centroids(bcIx2(41:80))*fluidVE.rho(2)*norm(gravity));
+bc = addBC(bc, bcIx2(81:120), 'pressure', G.cells.centroids(bcIx2(81:120))*fluidVE.rho(2)*norm(gravity));
+bc = addBC(bc, bcIx2(121:end), 'flux', 0);
+bc = rmfield(bc, 'sat');
+
+initState.pressure = fluidVE.rho(2) * norm(g) * CG.cells.centroids(:,3);
+initState.s        = repmat([1,0], CG.cells.num, 1);
+initState.sGmax    = initState.s(:,2);
+
+fluid = initSimpleADIFluid('phases', 'WG'                           , ...
+                           'mu'  , [fluidVE.mu(2),  fluidVE.mu(1)]  , ...
+                           'rho' , [fluidVE.rho(2), fluidVE.rho(1)] , ...
+                           'pRef', p_ref            , ...
+                           'c'   , [cf_wat, cf_co2] , ...
+                           'cR'  , cf_rock          , ...
+                           'n'   , [2 2]);
+pe   = 5 * kilo * Pascal;
+pcWG = @(sw) pe * sw.^(-1/2);
+fluid.pcWG = @(sg) pcWG(max((1-sg-fluidVE.res_water)./(1-fluidVE.res_water), 1e-5));
+fluid.krW = @(s) fluid.krW(max((s-fluidVE.res_water)./(1-fluidVE.res_water), 0));
+fluid.krG = @(s) fluid.krG(max((s-fluidVE.res_gas)./(1-fluidVE.res_gas), 0));
+
+%% Main loop
 timesteps = [2010*year(), 10*year(), 0.5*year(), 100*year()];
-% in MT CO2 ==> 50 MT over 10 years = 5 MT per year
-total_inj = (50 / (timesteps(2)/year) );
+total_inj = (25 / (timesteps(2)/year) ); % 25 MT over 10 yrs = 2.5 MT/yr
 min_inj   = 0.2; % in MT CO2
 conversion = fluidVE.rho(1) * (year/2) / 1e3 / mega;
 
-%% Main loop
 parfor (i=0:1271)
-    [rock, rock2D]       = gen_rock(G, Gt, i);
-    [W, WVE, wellIx]     = gen_wells(G, Gt, rock2D);
+
+    i = 1234;
+    % setup
+    [rock, rock2d]       = gen_rock(G, Gt, i);
+    [W, W2, WVE, wellIx] = gen_wells(G, CG, Gt, rock2d);
     [controls]           = gen_controls(timesteps, total_inj, min_inj, W, fluidVE);
-    [SVE, preComp, sol0] = gen_init(Gt, rock2D, fluidVE, W, p_init);
-    [states]             = gen_simulation(timesteps, sol0, Gt, rock2D, ...
+
+    figure(1); clf; plotCellData(G, rock.poro); plotWell(G,W); view(-25,60); colormap jet; colorbar
+    figure(2); clf; plotCellData(CG, rock2d.poro); plotWell(CG,W2); view(-25,60); colormap jet; colorbar
+    
+
+
+    % AD-3D
+    [schedule]           = gen_schedule(timesteps, W2, bc, controls);
+    [wellSol, states2]   = gen_ADsimulation(CG, rock2d, fluid, initState, schedule);
+    % VE
+    [SVE, preComp, sol0] = gen_init(Gt, rock2d, fluidVE, W, p_init);
+    [states]             = gen_simulation(timesteps, sol0, Gt, rock2d, ...
                                           WVE, controls, fluidVE, bcVE, ...
                                           SVE, preComp, ts);
-
-    parsave(sprintf('states/states_%d', i), states);
+    % save outputs
+    parsave(sprintf('states/VE2d/states_%d', i), states);
+    parsave(sprintf('states/AD2d/states_%d', i), states2);
     parsave(sprintf('controls/controls_%d', i), controls*conversion);
     parsave(sprintf('well_locs/well_locs_%d', i), wellIx);
-    parsave(sprintf('rock/VE2d/rock2d_%d', i), rock2D);
+    parsave(sprintf('rock/VE2d/rock2d_%d', i), rock2d);
     parsave(sprintf('rock/poreVolume/pv_%d', i), poreVolume(G,rock));
-    parsave(sprintf('rock/poreVolume2d/pv2d_%d', i), poreVolume(Gt, rock2D));
+    parsave(sprintf('rock/poreVolume2d/pv2d_%d', i), poreVolume(Gt, rock2d));
     fprintf('Simulation %i done\n', i)
 end
 disp('... All Done!');
 
 %% END
-
 %{
-    figure(2); clf; plotCellData(Gt, p_init); colormap jet; colorbar; view(25,45)
-    figure(3); clf; plotCellData(G, rock.poro); colormap jet; colorbar; view(25,45); plotWell(G,W)
-    figure(4); clf; plot(controls' * conversion);
-    figure(4); hold on; plot(sum(controls)' * conversion);
-    figure(5); clf; plotToolbar(Gt, states); colormap jet; colorbar; view(25,45)
-
-progressQueue = parallel.pool.DataQueue;
-hWaitbar = waitbar(0, 'Processing...');
-afterEach(progressQueue, @(~) updateWaitbar(hWaitbar, numIterations));
-progressCount = 0;
-
-send(progressQueue, i); %inside parfor
-close(hWaitbar); %after parfor
-
-function updateWaitbar(hWaitbar, numIterations)
-    persistent count;
-    if isempty(count)
-        count = 0;
-    end
-    count = count + 1;
-    waitbar(count / numIterations, hWaitbar);
+free    = zeros(40,1);
+trapped = zeros(40,1);
+leaked  = zeros(40,1);
+totvol  = zeros(40,1);
+conversion = fluidVE.rho(1) / 1e3 / mega;
+tsteps = cumsum([repmat(timesteps(3),20,1); repmat(timesteps(4),20,1)]/year);
+for i=1:40
+    free(i) = states(i).freeVol * conversion;
+    trapped(i) = states(i).trappedVol * conversion;
+    leaked(i) = states(i).leakedVol * conversion;
+    totvol(i) = states(i).totVol * conversion;
 end
-%}
 
-%{
-% Figures
-figure(1); clf
-alpha = 0.25;
-subplot(231)
-plotCellData(G, rock.poro, 'edgealpha',alpha)
-title('Porosity [v/v]'); colormap jet
-subplot(232)
-plotCellData(G, rock.poro, 'edgealpha',alpha)
-title('Porosity [v/v]'); colormap jet; colorbar('horizontal'); view(-30,45)
-subplot(233)
-plotCellData(Gt, rock2D.poro, 'edgealpha',alpha)
-title('Porosity [v/v]'); colormap jet; colorbar('horizontal'); view(-30,45)
-
-subplot(234)
-plotCellData(G, log10(convertTo(rock.perm(:,1), milli*darcy)), 'edgealpha',alpha)
-title('LogPerm [mD]'); colormap jet
-subplot(235)
-plotCellData(G, log10(convertTo(rock.perm(:,1), milli*darcy)), 'edgealpha',alpha)
-title('LogPerm [mD]'); colormap jet; colorbar('horizontal'); view(-30,45)
-subplot(236)
-plotCellData(Gt, log10(convertTo(rock2D.perm(:,1), milli*darcy)), 'edgealpha',alpha)
-title('LogPerm [mD]'); colormap jet; colorbar('horizontal'); view(-30,45)
-
-figure(2); clf; 
-plotToolbar(Gt, states, 'edgecolor','k','edgealpha',0.25); 
-view(-30,80); colorbar;
+figure(6); clf; 
+plot(tsteps, totvol, 'color', 'k', 'marker', 'o'); hold on
+plot(tsteps, free, 'color','blue', 'marker', 's')
+plot(tsteps, trapped, 'color', 'green', 'marker', 'v')
+plot(tsteps, leaked, 'color', 'red', 'marker', 'x')
+legend('total','free','trapped','leaked', 'Location', 'northwest')
+grid; xscale('log'); xlim([0.5,2010])
 %}

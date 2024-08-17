@@ -8,7 +8,7 @@ function [rock, rock2D] = gen_rock(G, Gt, realization)
     kk(:,3) = 0.1*k;
     rock = makeRock(G, kk, pp);
     rock2D = averageRock(rock, Gt);
-    
+
     clear r pp k kk
 
 end

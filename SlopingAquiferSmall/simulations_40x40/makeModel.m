@@ -1,4 +1,4 @@
-function [G, Gt, rock, rock2D, bcIxVE] = makeModel()
+function [G, Gt, rock, rock2D, bcIx, bcIxVE] = makeModel()
 %Make an example model of a sloping aquifer with heterogeneous rock props
 %
 % SYNOPSIS:

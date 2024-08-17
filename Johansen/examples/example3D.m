@@ -12,6 +12,7 @@ mrstModule add ad-core;
 mrstModule add ad-props;
 mrstModule add ad-blackoil;
 mrstModule add co2lab;
+mrstModule add mrst-gui;
 
 %% Grid and rock
 
@@ -94,6 +95,10 @@ wc_global = false(G.cartDims);
 wc_global(48, 48, 6:10) = true;
 wc = find(wc_global(G.cells.indexMap));
 
+wc2_global = false(G.cartDims);
+wc2_global(16, 80, 6:10) = true;
+wc2 = find(wc2_global(G.cells.indexMap));
+
 % plot well cells
 plotGrid(G, 'facecolor', 'none', 'edgealpha', 0.1);
 plotGrid(G, wc, 'facecolor', 'red');
@@ -110,6 +115,13 @@ W = addWell([], G, rock, wc, ...
             'type', 'rate', ...  % inject at constant rate
             'val', inj_rate, ... % volumetric injection rate
             'comp_i', [0 1]);    % inject CO2, not water
+
+W = addWell(W, G, rock, wc2, ...
+            'type', 'rate', ...
+            'val', inj_rate, ...
+            'comp_i', [0 1]);
+
+figure(1); clf; plotCellData(G, rock.poro); plotWell(G,W); view(-63,68); colormap jet; colorbar
 
 %% Boundary conditions
 
@@ -128,7 +140,9 @@ bc = addBC(bc, bcIx, 'pressure', p_bc, 'sat', [1, 0]);
 % Modifying the well in the second copy to have a zero flow rate.
 schedule.control    = struct('W', W, 'bc', bc);
 schedule.control(2) = struct('W', W, 'bc', bc);
-schedule.control(2).W.val = 0;
+for i=1:2
+    schedule.control(2).W(i).val = 0;
+end
 
 % Specifying length of simulation timesteps
 schedule.step.val = [repmat(year, 100, 1); ...
@@ -146,9 +160,9 @@ schedule.step.control = [ones(20,1)];
 %% Model
 
 model = TwoPhaseWaterGasModel(G, rock, fluid, 0, 0);
-
-%% Simulate
 [wellSol, states] = simulateScheduleAD(initState, model, schedule);
+
+figure(2); clf; plotToolbar(G, states); plotWell(G,W); colormap jet; colorbar; view(-63,68)
 
 %% Plot results
 figure; plotCellData(G, states{1}.s(:,2)); view(-63, 68); colorbar; 
