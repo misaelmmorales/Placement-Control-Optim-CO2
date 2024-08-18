@@ -5,7 +5,7 @@ function [W, W2, WVE, wellIx] = gen_wells(G, CG, Gt, rock2d)
 % Hydrostatic boundary conditions are specified on all outer boundaries.
 
     num_wells = randi([1,5]);
-    wellIx    = randi([4,36], [num_wells, 2]);
+    wellIx    = randi([8,32], [num_wells, 2]);
 
     rock = rock2d.parent;
     refDepth = G.cells.centroids(G.cells.num/2, G.griddim);

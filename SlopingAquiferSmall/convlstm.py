@@ -4,7 +4,7 @@ from neuralop.layers.spectral_convolution import SpectralConv
 
 class ConvLSTMCell(nn.Module):
 
-    def __init__(self, input_dim, hidden_dim, kernel_size, bias, n_modes=(10,10), device='cpu'):
+    def __init__(self, input_dim, hidden_dim, kernel_size, bias, n_modes=(10,10), spectral:bool=True, device='cpu'):
         """
         Initialize ConvLSTM cell.
 
@@ -29,18 +29,21 @@ class ConvLSTMCell(nn.Module):
         self.padding = kernel_size[0] // 2, kernel_size[1] // 2
         self.bias = bias
 
-        self.c = nn.Conv2d(in_channels=self.input_dim + self.hidden_dim,
-                           out_channels=4 * self.hidden_dim,
-                           kernel_size=self.kernel_size,
-                           padding=self.padding,
-                           bias=self.bias, 
-                           device=device)
-        
-        self.conv = SpectralConv(in_channels  = self.input_dim + self.hidden_dim,
-                                 out_channels = 4 * self.hidden_dim,
-                                 n_modes      = n_modes,
-                                 n_layers     = 1).to(self.c.weight.device)
+        self.c = nn.Conv2d(self.input_dim+self.hidden_dim, 4*self.hidden_dim, self.kernel_size, device=device)
 
+        if spectral:
+            self.conv = SpectralConv(in_channels  = self.input_dim + self.hidden_dim,
+                                    out_channels = 4 * self.hidden_dim,
+                                    n_modes      = n_modes,
+                                    n_layers     = 1).to(self.c.weight.device)
+        else:
+            self.conv = nn.Conv2d(in_channels=self.input_dim + self.hidden_dim,
+                                  out_channels=4 * self.hidden_dim,
+                                  kernel_size=self.kernel_size,
+                                  padding=self.padding,
+                                  bias=self.bias, 
+                                  device=device).to(self.c.weight.device)
+        
     def forward(self, input_tensor, cur_state):
         device = self.c.weight.device
         h_cur, c_cur = cur_state
@@ -92,7 +95,7 @@ class ConvLSTM(nn.Module):
         >> h = last_states[0][0]  # 0 for layer index, 0 for h index
     """
 
-    def __init__(self, input_dim, hidden_dim, kernel_size, num_layers,
+    def __init__(self, input_dim, hidden_dim, kernel_size, num_layers, spectral:bool=True,
                  batch_first=False, bias=True, return_all_layers=False, device='cpu'):
         super(ConvLSTM, self).__init__()
 
@@ -120,6 +123,7 @@ class ConvLSTM(nn.Module):
                                           hidden_dim=self.hidden_dim[i],
                                           kernel_size=self.kernel_size[i],
                                           bias=self.bias,
+                                          spectral=spectral,
                                           device=device))
 
         self.cell_list = nn.ModuleList(cell_list)

@@ -1,0 +1,26 @@
+------------------------------------------------------------
+----------------------- VERSION INFO -----------------------
+TF version: 2.15.0 | # Device(s) available: 2
+TF Built with CUDA? True | CUDA: 12.2 | cuDNN: 8
+PhysicalDevice(name='/physical_device:GPU:0', device_type='GPU')
+------------------------------------------------------------
+
+timesteps: 40 | deltatime: [ 0.5 50. ]
+X: (929, 64, 64, 6) | c: (929, 20, 5)
+y1: (929, 20, 64, 64, 2) | y2: (929, 20, 64, 64, 1)
+porosity     - min: -0.62 | max: 2.35
+logperm      - min: -2.19 | max: 2.48
+poreVol      - min: -0.62 | max: 2.45
+tops         - min: 0.00 | max: 1.00
+heights      - min: 0.00 | max: 1.00
+controls     - min: 0.00 | max: 0.83
+pressure_1   - min: 0.08 | max: 0.91
+saturation_1 - min: 0.00 | max: 0.94
+saturation_2 - min: 0.00 | max: 0.94
+X_train:  (800, 64, 64, 6)     | c_train: (800, 20, 5)
+y1_train: (800, 20, 64, 64, 2) | y2_train: (800, 20, 64, 64, 1)
+----------------------------------------------------------------------
+X_test:  (129, 64, 64, 6)     | c_test: (129, 20, 5)
+y1_test: (129, 20, 64, 64, 2) | y2_test: (129, 20, 64, 64, 1)
+# parameters: 159,807,842
+Epoch 1/100

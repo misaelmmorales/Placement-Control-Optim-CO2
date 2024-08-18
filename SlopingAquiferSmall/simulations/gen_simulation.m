@@ -1,4 +1,4 @@
-function [states] = gen_simulation(tsteps, sol, Gt, rock2D, WVE, controls, fluidVE, bcVE, SVE, preComp, ts)
+function [states] = gen_simulation(tsteps, sol, Gt, rock, WVE, controls, fluidVE, bcVE, SVE, preComp, ts)
 
 % Main loop
 % Run the simulation using a sequential splitting with pressure and
@@ -9,8 +9,6 @@ function [states] = gen_simulation(tsteps, sol, Gt, rock2D, WVE, controls, fluid
     % Initialize parameters
     t         = 0;
     totVol    = 0.0;
-    rock      = rock2D.parent;
-    num_wells = size(WVE,1);
     count     = 1;
     states    = struct('pressure', [], 's',   [], 's3d',     [], ...
                        't',        [], 'dT',  [], 'wellSol', [], ...
@@ -26,15 +24,15 @@ function [states] = gen_simulation(tsteps, sol, Gt, rock2D, WVE, controls, fluid
     while t<T
         
         if count <= (stopInject/dT)
-            for k=1:num_wells
+            for k=1:size(WVE,1)
                 WVE(k).val = controls(k, count);
             end
         end
 
        % Advance solution: compute pressure and then transport
        sol = solveIncompFlowVE(sol, Gt, SVE, rock, fluidVE, ...
-                               'bc', bcVE, ...
-                               'wells', WVE);
+                               'bc', bcVE, 'wells', WVE);
+
        sol = explicitTransportVE(sol, Gt, dT, rock, fluidVE, ...
                                  'bc'      , bcVE    , ...
                                  'wells'   , WVE     , ...
@@ -51,7 +49,7 @@ function [states] = gen_simulation(tsteps, sol, Gt, rock2D, WVE, controls, fluid
        if ~isempty(WVE)
           totVol = totVol + sum([WVE.val])*dT;
        end
-       vol = volumesVE(Gt, sol, rock2D, fluidVE, ts);
+       vol = volumesVE(Gt, sol, rock, fluidVE, ts);
     
        states(count).pressure   = sol.pressure;
        states(count).s          = sol.h ./ Gt.cells.H;
@@ -59,8 +57,8 @@ function [states] = gen_simulation(tsteps, sol, Gt, rock2D, WVE, controls, fluid
        states(count).wellSol    = sol.wellSol;
        states(count).totVol     = totVol;
        states(count).vol        = vol;
-       states(count).freeVol    = sum(sol.h .* rock2D.poro .* Gt.cells.volumes)*(1-fluidVE.res_water);
-       states(count).trappedVol = sum((sol.h_max - sol.h) .* rock2D.poro .* Gt.cells.volumes)*fluidVE.res_gas;
+       states(count).freeVol    = sum(sol.h .* rock.poro .* Gt.cells.volumes)*(1-fluidVE.res_water);
+       states(count).trappedVol = sum((sol.h_max - sol.h) .* rock.poro .* Gt.cells.volumes)*fluidVE.res_gas;
        states(count).leakedVol  = max(0, totVol - sum(vol));
        states(count).t          = convertTo(t, year);
        states(count).dT         = convertTo(dT, year);
