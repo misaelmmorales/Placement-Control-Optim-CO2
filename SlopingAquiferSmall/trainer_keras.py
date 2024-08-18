@@ -101,33 +101,17 @@ print('y1_train: {} | y2_train: {}'.format(y1_train.shape, y2_train.shape))
 print('-'*70)
 print('X_test:  {}     | c_test: {}'.format(X_test.shape, c_test.shape))
 print('y1_test: {} | y2_test: {}'.format(y1_test.shape, y2_test.shape))
-
-class SqueezeExcite(Layer):
-    def __init__(self, ratio=4, **kwargs):
-        super(SqueezeExcite, self).__init__(**kwargs)
-        self.ratio = ratio
-
-    def build(self, input_shape):
-        channels = input_shape[-1]
-        self.squeeze = layers.GlobalAveragePooling2D()
-        self.excite1 = layers.Dense(channels // self.ratio, activation='relu')
-        self.excite2 = layers.Dense(channels, activation='sigmoid')
-        super(SqueezeExcite, self).build(input_shape)
-
-    def call(self, inputs):
-        se_tensor = self.squeeze(inputs)
-        se_tensor = self.excite1(se_tensor)
-        se_tensor = self.excite2(se_tensor)
-        se_tensor = layers.Reshape((1, 1, se_tensor.shape[-1]))(se_tensor)
-        scaled_inputs = layers.Multiply()([inputs, se_tensor])
-        return layers.Add()([inputs, scaled_inputs])
-    
-    def compute_output_shape(self, input_shape):
-        return input_shape
-    
-def encoder_layer(inp, filt, k=3, pad='same', drop=0.1, pool=(2,2)):
-    _ = layers.SeparableConv2D(filt, k, padding=pad, activity_regularizer=regularizers.l1(1e-6))(inp)
-    _ = SqueezeExcite()(_)
+  
+def encoder_layer(inp, filt, k=3, pad='same', drop=0.1, pool=(2,2), lambda_reg=1e-6):
+    def squeeze_excite(z, ratio:int=4):
+        _ = layers.GlobalAveragePooling2D()(z)
+        _ = layers.Dense(filt//ratio, activation='relu')(_)
+        _ = layers.Dense(filt, activation='sigmoid')(_)
+        _ = layers.Reshape((1, 1, filt))(_)
+        w = layers.Multiply()([z, _])
+        return layers.Add()([z, w])
+    _ = layers.SeparableConv2D(filt, k, padding=pad)(inp)
+    _ = squeeze_excite(_)
     _ = layers.GroupNormalization(groups=-1)(_)
     _ = layers.PReLU()(_)
     _ = layers.MaxPooling2D(pool)(_)
@@ -218,19 +202,27 @@ def make_model(nt=20, hidden=[8, 16, 64], verbose:bool=True):
     return model
 
 class MonitorCallback(Callback):
-    def __init__(self, monitor:int=10):
+    def __init__(self, monitor:int=10, verbose:int=1):
         super(MonitorCallback, self).__init__()
         self.monitor = monitor
+        self.verbose = verbose
 
     def on_epoch_end(self, epoch, logs=None):
         if (epoch+1) % self.monitor == 0:
-            print('Epoch: {} | Loss: {:.5f} | Val Loss: {:.5f}'.format(epoch+1, logs['loss'], logs['val_loss']))
+            if self.verbose == 2:
+                print('Epoch: {} | Loss: {:.5f} | Val Loss: {:.5f}'.format(epoch+1, logs['loss'], logs['val_loss']))
+            elif self.verbose == 1:
+                print('Epoch: {} | Loss: {:.5f}'.format(epoch+1, logs['loss']))
+            elif self.verbose == 0:
+                pass
+            else:
+                raise ValueError('Invalid verbose value. Use 0, 1 or 2.')
 
 esCallback = keras.callbacks.EarlyStopping(monitor='val_accuracy', patience=20, restore_best_weights=True)
 mcCallback = keras.callbacks.ModelCheckpoint('pix2vid-opt.keras', monitor='val_accuracy', save_best_only=True)
-customCBs  = [MonitorCallback(monitor=10), esCallback, mcCallback]
+customCBs  = [MonitorCallback(monitor=10, verbose=1), esCallback, mcCallback]
 
-def custom_loss(true, pred, a=0.8, b=0.8):
+def custom_loss(true, pred, a=(3/4), b=(4/5)):
     ssim_loss  = tf.reduce_mean(1.0 - tf.image.ssim(true, pred, max_val=1.0))
     mse_loss   = tf.reduce_mean(tf.square(true - pred))
     mae_loss   = tf.reduce_mean(tf.abs(true - pred))
@@ -247,7 +239,8 @@ fit = model.fit(x=[X_train, c_train], y=[y1_train, y2_train],
                 epochs           = 100,
                 validation_split = 0.2,
                 shuffle          = True,
-                verbose          = 1)
-print('-'*30+'\n'+'Training time: {:.2f} minutes'.format((time()-start)/60))
+                callbacks        = [MonitorCallback(monitor=5, verbose=1)],
+                verbose          = 0)
+print('-'*30+'\n'+'Training time: {:.3f} minutes'.format((time()-start)/60))
 model.save('pix2vid-v2.keras')
 pd.DataFrame(fit.history).to_csv('pix2vid-v2.csv', index=False)
