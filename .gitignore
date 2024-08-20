@@ -26,4 +26,6 @@ SlopingAquifer/rock/perm_160x160x5_n159_b*
 SlopingAquiferSmall/**/*.mat
 SlopingAquiferSmall/**/*.npy
 SlopingAquiferSmall/**/*.csv
-SlopingAquiferSmall/pix2vid-v2.keras
+
+SlopingAquiferSmall/**/*.keras
+SlopingAquiferSmall/**/*.weights.h5

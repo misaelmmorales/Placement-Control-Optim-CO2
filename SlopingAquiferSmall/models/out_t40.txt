@@ -1,0 +1,47 @@
+--------------------------------------------------------------
+------------------------ VERSION INFO ------------------------
+TF version: 2.15.0 | Keras: 3.5.0 | # Device(s) available: 2
+TF Built with CUDA? True | CUDA: 12.2 | cuDNN: 8
+PhysicalDevice(name='/physical_device:GPU:0', device_type='GPU')
+--------------------------------------------------------------
+
+timesteps: 40 | deltatime: [ 0.5 50. ]
+X: (929, 64, 64, 5) | c: (929, 20, 5)
+y1: (929, 20, 64, 64, 2) | y2: (929, 20, 64, 64, 1)
+porosity     - min: -0.62 | max: 2.35
+logperm      - min: -2.19 | max: 2.48
+wells        - min: 0.00 | max: 1.00
+tops         - min: 0.00 | max: 1.00
+volumes      - min: 0.00 | max: 1.00
+controls     - min: 0.00 | max: 0.83
+pressure_1   - min: 0.08 | max: 0.91
+saturation_1 - min: 0.00 | max: 0.94
+saturation_2 - min: 0.00 | max: 0.94
+X_train:  (800, 64, 64, 5)     | c_train: (800, 20, 5)
+y1_train: (800, 20, 64, 64, 2) | y2_train: (800, 20, 64, 64, 1)
+----------------------------------------------------------------------
+X_test:  (129, 64, 64, 5)     | c_test: (129, 20, 5)
+y1_test: (129, 20, 64, 64, 2) | y2_test: (129, 20, 64, 64, 1)
+# parameters: 159,890,208
+Epoch: 5 | Loss: 0.06462
+Epoch: 10 | Loss: 0.05010
+Epoch: 15 | Loss: 0.04396
+Epoch: 20 | Loss: 0.04112
+Epoch: 25 | Loss: 0.03939
+Epoch: 30 | Loss: 0.03859
+Epoch: 35 | Loss: 0.03748
+Epoch: 40 | Loss: 0.03709
+Epoch: 45 | Loss: 0.03661
+Epoch: 50 | Loss: 0.03612
+Epoch: 55 | Loss: 0.03571
+Epoch: 60 | Loss: 0.03550
+Epoch: 65 | Loss: 0.03559
+Epoch: 70 | Loss: 0.03534
+Epoch: 75 | Loss: 0.03503
+Epoch: 80 | Loss: 0.03468
+Epoch: 85 | Loss: 0.03462
+Epoch: 90 | Loss: 0.03421
+Epoch: 95 | Loss: 0.03454
+Epoch: 100 | Loss: 0.03414
+------------------------------
+Training time: 65.681 minutes

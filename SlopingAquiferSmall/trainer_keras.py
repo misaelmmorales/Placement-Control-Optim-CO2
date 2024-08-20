@@ -1,4 +1,6 @@
 import os
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3' 
+
 import numpy as np
 import pandas as pd
 from time import time
@@ -8,17 +10,26 @@ import matplotlib.pyplot as plt
 
 import keras
 import tensorflow as tf
-from keras import Model
-from keras.layers import Layer
-from keras.callbacks import Callback
-from keras import layers, regularizers, optimizers, losses, metrics, callbacks
+from keras import Model, layers, regularizers, optimizers, losses, callbacks, metrics
+
+from pix2vid2 import make_model, MonitorCallback
+from pix2vid2 import CustomLoss, custom_loss
 
 NUM_REALIZATIONS = 929
-X_CHANNELS  = 6
+X_CHANNELS  = 5
 Y1_CHANNELS = 2
 Y2_CHANNELS = 1
 NX, NY, NZ = 64, 64, 1
-NTT, NT0   = 40, 20
+NTT, NT1, NT2 = 40, 20, 5
+HIDDEN = [16, 64, 256]
+
+NTRAIN = 800
+EPOCHS = 100
+MONITOR = 5
+BATCH_SIZE = 8
+LEARNING_RATE = 1e-3
+WEIGHT_DECAY = 1e-6
+PATIENCE = 20
 
 sec2year   = 365.25 * 24 * 60 * 60
 Darcy      = 9.869233e-13
@@ -29,218 +40,116 @@ mega       = 1e6
 
 def check_tf_gpu():
     sys_info = tf.sysconfig.get_build_info()
+    kversion = keras.__version__
     version, cuda, cudnn = tf.__version__, sys_info["cuda_version"], sys_info["cudnn_version"]
     count = len(tf.config.experimental.list_physical_devices())
     name  = [device.name for device in tf.config.experimental.list_physical_devices('GPU')]
-    print('-'*60)
-    print('----------------------- VERSION INFO -----------------------')
-    print('TF version: {} | # Device(s) available: {}'.format(version, count))
+    print('-'*62)
+    print('------------------------ VERSION INFO ------------------------')
+    print('TF version: {} | Keras: {} | # Device(s) available: {}'.format(version, kversion, count))
     print('TF Built with CUDA? {} | CUDA: {} | cuDNN: {}'.format(tf.test.is_built_with_cuda(), cuda, cudnn))
     print(tf.config.list_physical_devices()[-1])
-    print('-'*60+'\n')
+    print('-'*62+'\n')
     return None
 check_tf_gpu()
 
 deltatime = sio.loadmat('simulations/data/time_arr.mat', simplify_cells=True)['time_arr']
 timesteps = np.cumsum(deltatime)
+timesteps_inj = timesteps[:20]
+timesteps_mon = timesteps[[21, 24, 29, 34, 39]]
 print('timesteps: {} | deltatime: {}'.format(len(timesteps), np.unique(deltatime)))
+print('injection: {}'.format(timesteps_inj))
+print('monitoring: {}'.format(timesteps_mon))
 
 # Load data
 X_data = np.load('simulations/data/X_data.npy')
 c_data = np.load('simulations/data/c_data.npy')
 y1_data = np.load('simulations/data/y1_data.npy')
-y2_data = np.load('simulations/data/y2_data.npy')
+y2_data = np.load('simulations/data/y2_data.npy')[:,[1,4,9,14,19]]
 print('X: {} | c: {}'.format(X_data.shape, c_data.shape))
 print('y1: {} | y2: {}'.format(y1_data.shape, y2_data.shape))
 
 # Normalize data
 pmu, psd = X_data[...,0].mean(), X_data[...,0].std() # porosity
 kmu, ksd = X_data[...,1].mean(), X_data[...,1].std() # permeability
-vmu, vsd = X_data[...,3].mean(), X_data[...,3].std() # poreVol
-tmi, tma = X_data[...,4].min(),  X_data[...,4].max() # tops
-hmi, hma = X_data[...,5].min(),  X_data[...,5].max() # heights
+wmi, wma = X_data[...,2].min(),  X_data[...,2].max() # wells
+tmi, tma = X_data[...,3].min(),  X_data[...,3].max() # tops
+vmi, vma = X_data[...,4].min(),  X_data[...,4].max() # volumes
 cmi, cma = c_data.min(),         c_data.max()        # controls
 
 X_data[...,0] = (X_data[...,0] - pmu) / (3.33*psd)
 X_data[...,1] = (X_data[...,1] - kmu) / (3.33*ksd)
-X_data[...,3] = (X_data[...,3] - vmu) / (3.33*vsd)
-X_data[...,4] = (X_data[...,4] - tmi) / (tma - tmi)
-X_data[...,5] = (X_data[...,5] - hmi) / (hma - hmi)
+X_data[...,2] = (X_data[...,2] - wmi) / (wma - wmi)
+X_data[...,3] = (X_data[...,3] - tmi) / (tma - tmi)
+X_data[...,4] = (X_data[...,4] - vmi) / (vma - vmi)
 c_data = c_data / 2.0
 
 y1_data[...,0]  = y1_data[...,0]  / 50e3
-y1_data[...,-1] = y1_data[...,-1] / 0.73
-y2_data[...,-1] = y2_data[...,-1] / 0.73
+y1_data[...,-1] = y1_data[...,-1] / 0.7
+y2_data[...,-1] = y2_data[...,-1] / 0.7
 
 print('porosity     - min: {:.2f} | max: {:.2f}'.format(X_data[...,0].min(), X_data[...,0].max()))
 print('logperm      - min: {:.2f} | max: {:.2f}'.format(X_data[...,1].min(), X_data[...,1].max()))
-print('poreVol      - min: {:.2f} | max: {:.2f}'.format(X_data[...,3].min(), X_data[...,3].max()))
-print('tops         - min: {:.2f} | max: {:.2f}'.format(X_data[...,4].min(), X_data[...,4].max()))
-print('heights      - min: {:.2f} | max: {:.2f}'.format(X_data[...,5].min(), X_data[...,5].max()))
-print('controls     - min: {:.2f} | max: {:.2f}'.format(c_data.min(), c_data.max()))
+print('wells        - min: {:.2f} | max: {:.2f}'.format(X_data[...,2].min(), X_data[...,2].max()))
+print('tops         - min: {:.2f} | max: {:.2f}'.format(X_data[...,3].min(), X_data[...,3].max()))
+print('volumes      - min: {:.2f} | max: {:.2f}'.format(X_data[...,4].min(), X_data[...,4].max()))
+print('controls     - min: {:.2f} | max: {:.2f}'.format(c_data.min(),        c_data.max()))
 print('pressure_1   - min: {:.2f} | max: {:.2f}'.format(y1_data[...,0].min(), y1_data[...,0].max()))
 print('saturation_1 - min: {:.2f} | max: {:.2f}'.format(y1_data[...,-1].min(), y2_data[...,-1].max()))
 print('saturation_2 - min: {:.2f} | max: {:.2f}'.format(y2_data[...,-1].min(), y2_data[...,-1].max()))
 
-train_idx = np.random.choice(range(len(X_data)), 800, replace=False)
+train_idx = np.random.choice(range(len(X_data)), NTRAIN, replace=False)
+np.save('models/training_idx.npy', train_idx)
+print('Training index saved!')
+#np.load('models/training_idx.npy')
 test_idx  = np.setdiff1d(range(len(X_data)), train_idx)
-np.save('training_idx.npy', train_idx)
 
-X_train = X_data[train_idx]
-c_train = c_data[train_idx]
-y1_train = y1_data[train_idx]
-y2_train = y2_data[train_idx]
+# X_train = X_data[train_idx].astype(np.float32)
+# c_train = c_data[train_idx].astype(np.float32)
+# y1_train = y1_data[train_idx].astype(np.float32)
+# y2_train = y2_data[train_idx].astype(np.float32)
+# X_test = X_data[test_idx].astype(np.float32)
+# c_test = c_data[test_idx].astype(np.float32)
+# y1_test = y1_data[test_idx].astype(np.float32)
+# y2_test = y2_data[test_idx].astype(np.float32)
 
-X_test = X_data[test_idx]
-c_test = c_data[test_idx]
-y1_test = y1_data[test_idx]
-y2_test = y2_data[test_idx]
+X_train  = tf.cast(X_data[train_idx], tf.float32)
+c_train  = tf.cast(c_data[train_idx], tf.float32)
+y1_train = tf.cast(y1_data[train_idx], tf.float32)
+y2_train = tf.cast(y2_data[train_idx], tf.float32)
+X_test  = tf.cast(X_data[test_idx], tf.float32)
+c_test  = tf.cast(c_data[test_idx], tf.float32)
+y1_test = tf.cast(y1_data[test_idx], tf.float32)
+y2_test = tf.cast(y2_data[test_idx], tf.float32)
 
+print('-'*70)
 print('X_train:  {}     | c_train: {}'.format(X_train.shape, c_train.shape))
 print('y1_train: {} | y2_train: {}'.format(y1_train.shape, y2_train.shape))
 print('-'*70)
 print('X_test:  {}     | c_test: {}'.format(X_test.shape, c_test.shape))
 print('y1_test: {} | y2_test: {}'.format(y1_test.shape, y2_test.shape))
-  
-def encoder_layer(inp, filt, k=3, pad='same', drop=0.1, pool=(2,2), lambda_reg=1e-6):
-    def squeeze_excite(z, ratio:int=4):
-        _ = layers.GlobalAveragePooling2D()(z)
-        _ = layers.Dense(filt//ratio, activation='relu')(_)
-        _ = layers.Dense(filt, activation='sigmoid')(_)
-        _ = layers.Reshape((1, 1, filt))(_)
-        w = layers.Multiply()([z, _])
-        return layers.Add()([z, w])
-    _ = layers.SeparableConv2D(filt, k, padding=pad)(inp)
-    _ = squeeze_excite(_)
-    _ = layers.GroupNormalization(groups=-1)(_)
-    _ = layers.PReLU()(_)
-    _ = layers.MaxPooling2D(pool)(_)
-    #_ = layers.SpatialDropout2D(drop)(_)
-    return _
+print('-'*70)
 
-def lifting_layer(inp, dim, drop=0.1, nonlinearity='gelu'):
-    _ = layers.Dense(dim)(inp)
-    _ = layers.Activation(nonlinearity)(_)
-    #_ = layers.Dropout(drop)(_)
-    return _
+esCallback = callbacks.EarlyStopping(monitor='val_accuracy', patience=PATIENCE, restore_best_weights=True)
+mcCallback = callbacks.ModelCheckpoint('pix2vid-opt-v2.keras', monitor='val_accuracy', save_best_only=True)
+customCBs  = [MonitorCallback(monitor=10), esCallback, mcCallback]
 
-def recurrent_step(inp, filt, res, kern=3, pad='same', drop=0.0, leaky_slope=0.3):
-    y = layers.ConvLSTM2D(filt, kern, padding=pad)(inp)
-    y = layers.GroupNormalization(groups=-1)(y)
-    y = layers.LeakyReLU(leaky_slope)(y)
-    y = layers.Conv2DTranspose(filt, kern, padding=pad, strides=2)(y)
-    #y = layers.SpatialDropout2D(drop)(y)
-    y = layers.Concatenate()([y, res])
-    y = layers.Conv2D(filt, kern, padding=pad)(y)
-    y = layers.Activation('sigmoid')(y)
-    y = tf.expand_dims(y,1)
-    return y
-
-def recurrent_last(inp, filt, kern=3, pad='same', drop=0.0, leaky_slope=0.3, out_channels=2):
-    y = layers.ConvLSTM2D(filt, kern, padding=pad)(inp)
-    y = layers.GroupNormalization(groups=-1)(y)
-    y = layers.LeakyReLU(leaky_slope)(y)
-    y = layers.Conv2DTranspose(filt, kern, padding=pad, strides=2)(y)
-    #y = layers.SpatialDropout2D(drop)(y)
-    y = layers.Conv2D(out_channels, kern, padding=pad)(y)
-    y = layers.Activation('sigmoid')(y)
-    y = tf.expand_dims(y, 1)
-    return y
-
-def conditional_recurrent_decoder(z_input, c_input, residuals, rnn_filters=[8,16,64], 
-                                  previous_timestep=None, dropout=0.1, leaky_slope=0.3, 
-                                  out_channels:int=Y1_CHANNELS):
-    zz = tf.expand_dims(z_input, 1)
-    cc = tf.expand_dims(c_input, 1)
-    _ = tf.einsum('bthwc,btc->bthwc', zz, cc)
-    _ = recurrent_step(_, rnn_filters[0], residuals[0], drop=dropout, leaky_slope=leaky_slope)
-    _ = recurrent_step(_, rnn_filters[1], residuals[1], drop=dropout, leaky_slope=leaky_slope)
-    _ = recurrent_last(_, rnn_filters[2], drop=dropout, leaky_slope=leaky_slope, out_channels=out_channels)
-    if previous_timestep is not None:
-        _ = layers.Concatenate(axis=1)([previous_timestep, _])
-    return _
-
-def unconditional_recurrent_decoder(z_input, residuals, rnn_filters=[8,16,64], 
-                                    previous_timestep=None, dropout=0.1, leaky_slope=0.3,
-                                    out_channels:int=Y2_CHANNELS):    
-    _ = tf.expand_dims(z_input, 1)
-    _ = recurrent_step(_, rnn_filters[0], residuals[0], drop=dropout, leaky_slope=leaky_slope)
-    _ = recurrent_step(_, rnn_filters[1], residuals[1], drop=dropout, leaky_slope=leaky_slope)
-    _ = recurrent_last(_, rnn_filters[2], drop=dropout, leaky_slope=leaky_slope, out_channels=out_channels)
-    if previous_timestep is not None:
-        _ = layers.Concatenate(axis=1)([previous_timestep, _])
-    return _
-
-def make_model(nt=20, hidden=[8, 16, 64], verbose:bool=True):
-    x_inp = layers.Input(shape=(NX, NY, X_CHANNELS))
-    c_inp = layers.Input(shape=(nt, 5))
-
-    x1 = encoder_layer(x_inp, hidden[0])
-    x2 = encoder_layer(x1, hidden[1])
-    x3 = encoder_layer(x2, hidden[2])
-    zc = lifting_layer(c_inp, hidden[2])
-    t1 = None
-    for t in range(nt):
-        if t==0:
-            t1 = conditional_recurrent_decoder(x3, zc[:,t], [x2, x1], rnn_filters=hidden)
-        else:
-            t1 = conditional_recurrent_decoder(x3, zc[:,t], [x2, x1], rnn_filters=hidden, previous_timestep=t1) 
-            
-    d_inp = layers.Concatenate()([x_inp, t1[:,-1]])
-    w1 = encoder_layer(d_inp, hidden[0])
-    w2 = encoder_layer(w1, hidden[1])
-    w3 = encoder_layer(w2, hidden[2])
-    t2 = None
-    for t in range(nt):
-        if t==0:
-            t2 = unconditional_recurrent_decoder(w3, [w2, w1], rnn_filters=hidden)
-        else:
-            t2 = unconditional_recurrent_decoder(w3, [w2, w1], rnn_filters=hidden, previous_timestep=t2)
-    
-    model = Model(inputs=[x_inp, c_inp], outputs=[t1, t2])
-    if verbose: print('# parameters: {:,}'.format(model.count_params()))
-    return model
-
-class MonitorCallback(Callback):
-    def __init__(self, monitor:int=10, verbose:int=1):
-        super(MonitorCallback, self).__init__()
-        self.monitor = monitor
-        self.verbose = verbose
-
-    def on_epoch_end(self, epoch, logs=None):
-        if (epoch+1) % self.monitor == 0:
-            if self.verbose == 2:
-                print('Epoch: {} | Loss: {:.5f} | Val Loss: {:.5f}'.format(epoch+1, logs['loss'], logs['val_loss']))
-            elif self.verbose == 1:
-                print('Epoch: {} | Loss: {:.5f}'.format(epoch+1, logs['loss']))
-            elif self.verbose == 0:
-                pass
-            else:
-                raise ValueError('Invalid verbose value. Use 0, 1 or 2.')
-
-esCallback = keras.callbacks.EarlyStopping(monitor='val_accuracy', patience=20, restore_best_weights=True)
-mcCallback = keras.callbacks.ModelCheckpoint('pix2vid-opt.keras', monitor='val_accuracy', save_best_only=True)
-customCBs  = [MonitorCallback(monitor=10, verbose=1), esCallback, mcCallback]
-
-def custom_loss(true, pred, a=(3/4), b=(4/5)):
-    ssim_loss  = tf.reduce_mean(1.0 - tf.image.ssim(true, pred, max_val=1.0))
-    mse_loss   = tf.reduce_mean(tf.square(true - pred))
-    mae_loss   = tf.reduce_mean(tf.abs(true - pred))
-    pixel_loss = b * mse_loss + (1 - b) * mae_loss
-    return a * pixel_loss + (1 - a) * ssim_loss
-
-model = make_model(nt=20, hidden=[16,64,256])
-optimizer = keras.optimizers.AdamW(learning_rate=1e-3, weight_decay=1e-6)
-model.compile(optimizer=optimizer, loss=custom_loss, metrics=['mse'])
+model = make_model(hidden=HIDDEN)
+optimizer = optimizers.AdamW(learning_rate=LEARNING_RATE, weight_decay=WEIGHT_DECAY)
+model.compile(optimizer=optimizer, loss=CustomLoss(), metrics=['mse','mse'])
 
 start = time()
 fit = model.fit(x=[X_train, c_train], y=[y1_train, y2_train],
-                batch_size       = 8,
-                epochs           = 100,
+                batch_size       = BATCH_SIZE,
+                epochs           = EPOCHS,
                 validation_split = 0.2,
                 shuffle          = True,
-                callbacks        = [MonitorCallback(monitor=5, verbose=1)],
+                callbacks        = [MonitorCallback(monitor=MONITOR)],
                 verbose          = 0)
 print('-'*30+'\n'+'Training time: {:.3f} minutes'.format((time()-start)/60))
-model.save('pix2vid-v2.keras')
-pd.DataFrame(fit.history).to_csv('pix2vid-v2.csv', index=False)
+model.save('models/pix2vid-v2.keras')
+model.save_weights('models/pix2vid-v2.weights.h5')
+pd.DataFrame(fit.history).to_csv('models/pix2vid-v2.csv', index=False)
+
+print('... Done!')
+######################################## END ########################################
