@@ -31,6 +31,9 @@ min_inj   = 0.1; % in MT CO2
 
 %% Main loop
 parfor (i=0:1271)
+
+    i = 123;
+
     [rock, rock2D]       = gen_rock(G, Gt, i);
     [W, WVE, wellIx]     = gen_wells(G, Gt, rock2D);
     [controls]           = gen_controls(timesteps, total_inj, min_inj, W, fluidVE);

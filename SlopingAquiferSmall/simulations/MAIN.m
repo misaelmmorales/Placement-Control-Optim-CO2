@@ -71,17 +71,22 @@ time_arr = [repmat(timesteps(3)/year, timesteps(2)/timesteps(3), 1);
             repmat(timesteps(4)/year, (timesteps(1)-timesteps(2))/timesteps(4), 1)];
 save('data/time_arr.mat', 'time_arr')
 
-total_inj  = (10 / (timesteps(2)/year) ); % 10 MT over 10 yrs = 1 MT/yr
+total_inj  = (20 / (timesteps(2)/year) ); % 20 MT over 10 yrs = 2 MT/yr
 min_inj    = 0.2; % in MT CO2
-conversion = rhoc * (year/2) / 1e3 / mega;
+conversion = rhoc * year / 1e3 / mega;
 
 %% Run Simulation
 parfor i=0:1271
+    
+    i = 222;
+    
     [rock]            = gen_rock(i, perm, poro, facies);
     [W, WVE, wellIx]  = gen_wells(G, Gt, rock);
     [controls]        = gen_controls(timesteps, total_inj, min_inj, W, fluid);
     [schedule]        = gen_schedule(timesteps, W, bc, controls);
     [wellSol, states] = gen_ADsimulation(G, rock, fluid, initState, schedule);
+
+    figure(2); clf; plotToolbar(G,states); view(3); colormap jet; colorbar
 
     parsave(sprintf('states/states_%d', i), states);
     parsave(sprintf('controls/controls_%d', i), controls*conversion);
@@ -91,5 +96,26 @@ parfor i=0:1271
     fprintf('Simulation %i done\n', i)
 end
 disp('... All Done!');
+
+%% Vertical Equilibrium
+fluidVE = initVEFluidHForm(Gt, ...
+                           'mu' , [muco2 muw] .* centi*poise      , ...
+                           'rho', [rhoc  rhow] .* kilogram/meter^3 , ...
+                           'sr' , src, ... %residual co2 saturation
+                           'sw' , srw, ... %residual water saturation
+                           'kwm', [0.2142 0.85]);
+
+ts     = findTrappingStructure(Gt);
+p_init = repmat(P0, dims*dims, 1);
+bcVE = rmfield(bc, 'sat');
+bcVE.h = zeros(size(bcVE.face));
+
+i = 111;
+[rock]            = gen_rock(i, perm, poro, facies);
+[W, WVE, wellIx]  = gen_wells(G, Gt, rock);
+[controls]        = gen_controls(timesteps, total_inj, min_inj, W, fluid);
+[SVE, preComp, sol0] = gen_init(Gt, rock, fluidVE, W, p_init);
+[statesVE]        = gen_simulation(timesteps, sol0, Gt, rock, WVE, controls, ...
+                                        fluidVE, bcVE, SVE, preComp, ts);
 
 %% END

@@ -1,6 +1,6 @@
 function [rock, rock2D] = gen_rock(G, Gt, realization)
 
-    r = load(sprintf('E:/Placement-Control-Optim-CO2/SlopingAquiferSmall/rock/mat/rock_%d.mat', realization));
+    r = load(sprintf('E:/Placement-Control-Optim-CO2/SlopingAquiferSmall/simulations_64x64/rock/mat/rock_%d.mat', realization));
     pp = r.poro(:);
     %k = 10 .^ r.perm(:) * milli * darcy;
     k = convertFrom(r.perm(:), milli*darcy);

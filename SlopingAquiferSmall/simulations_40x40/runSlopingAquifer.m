@@ -112,7 +112,6 @@ min_inj    = 0.2; % in MT CO2
 conversion = fluidVE.rho(1) * (year/2) / 1e3 / mega;
 
 parfor (i=0:9)
-
     % setup
     [rock, rock2d]       = gen_rock(G, Gt, i);
     [W, W2, WVE, wellIx] = gen_wells(G, CG, Gt, rock2d);
