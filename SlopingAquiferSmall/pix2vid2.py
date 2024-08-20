@@ -12,7 +12,7 @@ X_CHANNELS = 5
 Y1_CHANNELS = 2
 Y2_CHANNELS = 1
 
-def encoder_layer(inp, filt, k=3, pad='same', pool=(2,2), lambda_reg=1e-6):
+def encoder_layer(inp, filt, k=3, pad='same', pool=(2,2), drop=0.1, lambda_reg=1e-6):
     def SqueezeExcite2d(z, ratio:int=4):
         _ = layers.GlobalAveragePooling2D()(z)
         _ = layers.Dense(filt//ratio, activation='relu')(_)
@@ -100,8 +100,8 @@ def make_model(hidden=[8, 16, 64], verbose:bool=True):
     x1 = encoder_layer(x_inp, hidden[0])
     x2 = encoder_layer(x1, hidden[1])
     x3 = encoder_layer(x2, hidden[2])
-    #zc, ac = lifting_attention_layer(c_inp, hidden[2])
-    zc = lifting_layer(c_inp, hidden[2])
+    zc, ac = lifting_attention_layer(c_inp, hidden[2])
+    #zc = lifting_layer(c_inp, hidden[2])
 
     t1 = None
     for t in range(NT1):
@@ -114,6 +114,8 @@ def make_model(hidden=[8, 16, 64], verbose:bool=True):
     for t in range(NT2):
         if t==0:
             t2 = unconditional_recurrent_decoder(x3, [x2, x1], rnn_filters=hidden)
+            td = layers.Reshape((1, NX, NY, 1))(t1[:,-1,...,-1])
+            t2 = layers.Multiply()([t2, td])
         else:
             t2 = unconditional_recurrent_decoder(x3, [x2, x1], rnn_filters=hidden, previous_timestep=t2)
     
