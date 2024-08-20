@@ -3,8 +3,10 @@ import numpy as np
 import scipy.io as sio
 from tqdm import tqdm
 
-NX, NY = 64, 64
-NTT, NT0 = 40, 20
+NX = 64
+NY = 64
+NTT = 40
+NT0 = 20
 psi2pascal = 6894.76
 
 rnames = os.listdir('simulations/rock')

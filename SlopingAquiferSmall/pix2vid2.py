@@ -2,8 +2,12 @@ import keras
 import tensorflow as tf
 from keras import Model, layers, callbacks, losses
 
-NX, NY, NZ = 64, 64, 1
-NTT, NT1, NT2 = 40, 20, 5
+NX = 64
+NY = 64
+NZ = 1
+NTT = 40
+NT1 = 20
+NT2 = 5
 X_CHANNELS = 5
 Y1_CHANNELS = 2
 Y2_CHANNELS = 1
