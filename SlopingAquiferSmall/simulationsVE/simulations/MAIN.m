@@ -48,6 +48,10 @@ conversion = fluidVE.rho(1) * (year/2) / 1e3 / mega;
 %% Run Simulation
 tic
 parfor i=0:999   
+
+    i = 123;
+
+
     [rock]               = gen_rock(i, perm, poro, facies);
     [W, WVE, wellIx]     = gen_wells(G, Gt, rock);
     [controls]           = gen_controls(timesteps, total_inj, min_inj, W, fluidVE);

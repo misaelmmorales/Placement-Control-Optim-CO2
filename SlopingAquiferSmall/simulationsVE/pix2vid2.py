@@ -28,6 +28,11 @@ def encoder_layer(inp, filt, k=3, pad='same', pool=(2,2), drop=0.1, lambda_reg=1
     return _
 
 def lifting_layer(inp, dim, nonlinearity='gelu'):
+    _ = layers.Dense(dim)(inp)
+    _ = layers.Activation(nonlinearity)(_)
+    return _
+
+def lifting_squeezexcite_layer(inp, dim, nonlinearity='gelu'):
     def SqueezeExcite1d(z, ratio:int=4):
         _ = layers.GlobalAveragePooling1D()(z)
         _ = layers.Dense(dim//ratio, activation='relu')(_)
@@ -100,9 +105,9 @@ def make_model(hidden=[8, 16, 64], verbose:bool=True):
     x1 = encoder_layer(x_inp, hidden[0])
     x2 = encoder_layer(x1, hidden[1])
     x3 = encoder_layer(x2, hidden[2])
-    zc, ac = lifting_attention_layer(c_inp, hidden[2])
-    #zc = lifting_layer(c_inp, hidden[2])
-
+    #zc, ac = lifting_attention_layer(c_inp, hidden[2])
+    #zc = lifting_squeezexcite_layer(c_inp, hidden[2])
+    zc = lifting_layer(c_inp, hidden[2])
     t1 = None
     for t in range(NT1):
         if t==0:
@@ -110,11 +115,10 @@ def make_model(hidden=[8, 16, 64], verbose:bool=True):
         else:
             t1 = conditional_recurrent_decoder(x3, zc[...,t,:], [x2, x1], rnn_filters=hidden, previous_timestep=t1) 
 
-    ww = layers.Concatenate(axis=-1)([x_inp, t1[:,-1]])
-    w1 = encoder_layer(ww, hidden[0])
+    t2 = None
+    w1 = encoder_layer(x_inp, hidden[0])
     w2 = encoder_layer(w1, hidden[1])
     w3 = encoder_layer(w2, hidden[2])
-    t2 = None
     for t in range(NT2):
         if t==0:
             t2 = unconditional_recurrent_decoder(w3, [w2, w1], rnn_filters=hidden)

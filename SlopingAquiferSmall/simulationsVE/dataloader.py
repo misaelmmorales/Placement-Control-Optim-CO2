@@ -18,7 +18,7 @@ mega       = 1e6
 deltatime = sio.loadmat('data/time_arr.mat', simplify_cells=True)['time_arr']
 timesteps = np.cumsum(deltatime)
 timesteps_inj = timesteps[:20]
-timesteps_mon = timesteps[[20, 24, 29, 34, 39]]
+timesteps_mon = timesteps[[19, 24, 29, 34, 39]]
 
 print('timesteps: {} | deltatime: {}'.format(len(timesteps), np.unique(deltatime)))
 print('injection: {}'.format(timesteps_inj))
