@@ -14,19 +14,17 @@ from keras import Model, layers, regularizers, optimizers, losses, callbacks, me
 
 from pix2vid2 import make_model, MonitorCallback, CustomLoss
 
+msteps = [0, 2, 4, 6, 8, 10, 12, 14, 16, 18]
+
 NUM_REALIZATIONS = 1000
+NX,  NY,  NZ = 64, 64, 1
+NTT, NT1, NT2 = 40, 20, len(msteps)
 X_CHANNELS  = 5
 Y1_CHANNELS = 2
 Y2_CHANNELS = 1
-NX = 64
-NY = 64
-NZ = 1
-NTT = 40
-NT1 = 20
-NT2 = 5 #10
-HIDDEN = [16, 64, 128]
+HIDDEN = [16, 64, 256]
 
-NTRAIN = 500
+NTRAIN = 600
 EPOCHS = 100
 MONITOR = 5
 BATCH_SIZE = 8
@@ -59,7 +57,7 @@ check_tf_gpu()
 deltatime = sio.loadmat('data/time_arr.mat', simplify_cells=True)['time_arr']
 timesteps = np.cumsum(deltatime)
 timesteps_inj = timesteps[:20]
-timesteps_mon = timesteps[20:][[0, 4, 9, 14, 19]]
+timesteps_mon = timesteps[20:][msteps]
 print('timesteps: {} | deltatime: {}'.format(len(timesteps), np.unique(deltatime)))
 print('injection: {}'.format(timesteps_inj))
 print('monitoring: {}'.format(timesteps_mon))
@@ -70,8 +68,8 @@ c_data = np.load('data/c_data.npy')   # (controls)
 y1_data = np.load('data/y1_data.npy') # (pressure,saturation)_inj
 y2_data = np.load('data/y2_data.npy') # (saturation)_monitor
 print('X: {} | c: {}'.format(X_data.shape, c_data.shape))
-#y2_data = y2_data[:,[0, 2, 4, 6, 8, 10, 12, 14, 16, 18]]
-y2_data = y2_data[:, [0, 4, 9, 14, 19]]
+y2_data = y2_data[:,msteps]
+#y2_data = y2_data[:, [0, 1, 2, 3, 4, 9, 14, 19]]
 print('y1: {} | y2: {}'.format(y1_data.shape, y2_data.shape))
 
 # Normalize data
@@ -139,12 +137,16 @@ esCallback = callbacks.EarlyStopping(monitor='val_accuracy', patience=PATIENCE, 
 mcCallback = callbacks.ModelCheckpoint('pix2vid-opt-v2.keras', monitor='val_accuracy', save_best_only=True)
 customCBs  = [MonitorCallback(monitor=10), esCallback, mcCallback]
 
-model = make_model(hidden=HIDDEN)
-optimizer = optimizers.Adam(learning_rate=LEARNING_RATE)#, weight_decay=WEIGHT_DECAY)
-model.compile(optimizer=optimizer, loss=CustomLoss(b=0.75, a=0.4), metrics=['mse','mse'])
+model1, model2 = make_model(hidden=HIDDEN)
+
+optimizer1 = optimizers.Adam(learning_rate=LEARNING_RATE)#, weight_decay=WEIGHT_DECAY)
+model1.compile(optimizer=optimizer1, loss=CustomLoss(b=0.75, a=0.4), metrics=['mse'])
+
+optimizer2 = optimizers.Adam(learning_rate=LEARNING_RATE)#, weight_decay=WEIGHT_DECAY)
+model2.compile(optimizer=optimizer2, loss=CustomLoss(b=0.75, a=0.4), metrics=['mse'])
 
 start = time()
-fit = model.fit(x=[X_train, c_train], y=[y1_train, y2_train],
+fit1 = model1.fit(x=[X_train, c_train], y=y1_train,
                 batch_size       = BATCH_SIZE,
                 epochs           = EPOCHS,
                 validation_split = 0.25,
@@ -152,9 +154,21 @@ fit = model.fit(x=[X_train, c_train], y=[y1_train, y2_train],
                 callbacks        = [MonitorCallback(monitor=MONITOR)],
                 verbose          = 0)
 print('-'*30+'\n'+'Training time: {:.3f} minutes'.format((time()-start)/60))
-model.save('models/pix2vid-v2.keras')
-model.save_weights('models/pix2vid-v2.weights.h5')
-pd.DataFrame(fit.history).to_csv('models/pix2vid-v2.csv', index=False)
+model1.save('models/pix2vid-v2-inj.keras')
+model1.save_weights('models/pix2vid-v2-inj.weights.h5')
+pd.DataFrame(fit1.history).to_csv('models/pix2vid-v2-inj.csv', index=False)
+
+start = time()
+fit2 = model2.fit(x=[X_train, c_train], y=y2_train,
+                batch_size       = BATCH_SIZE,
+                epochs           = EPOCHS,
+                validation_split = 0.25,
+                shuffle          = True,
+                callbacks        = [MonitorCallback(monitor=MONITOR)],
+                verbose          = 0)
+model2.save('models/pix2vid-v2-mon.keras')
+model2.save_weights('models/pix2vid-v2-mon.weights.h5')
+pd.DataFrame(fit2.history).to_csv('models/pix2vid-v2-mon.csv', index=False)
 
 print('... Done!')
 ######################################## END ########################################

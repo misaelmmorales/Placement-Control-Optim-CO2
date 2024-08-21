@@ -2,12 +2,8 @@ import keras
 import tensorflow as tf
 from keras import Model, layers, callbacks, losses
 
-NX = 64
-NY = 64
-NZ = 1
-NTT = 40
-NT1 = 20
-NT2 = 5 #10
+NX,  NY,  NZ = 64, 64, 1
+NTT, NT1, NT2 = 40, 20, 10
 X_CHANNELS = 5
 Y1_CHANNELS = 2
 Y2_CHANNELS = 1
@@ -107,35 +103,41 @@ def unconditional_recurrent_decoder(z_input, residuals, rnn_filters=[8,16,64],
         _ = layers.Concatenate(axis=1)([previous_timestep, _])
     return _
 
-def make_model(hidden=[8, 16, 64], verbose:bool=True):  
+def make_model(hidden=[8, 16, 64], nt1:int=NT1, nt2:int=NT2, verbose:bool=True):  
     x_inp = layers.Input(shape=(NX, NY, X_CHANNELS))
     c_inp = layers.Input(shape=(NT1, 5))
 
     x1 = encoder_layer(x_inp, hidden[0])
     x2 = encoder_layer(x1, hidden[1])
     x3 = encoder_layer(x2, hidden[2])
-    zc, ac = lifting_attention_layer(c_inp, hidden[2])
+    zc, _ = lifting_attention_layer(c_inp, hidden[2])
     #zc = lifting_squeezexcite_layer(c_inp, hidden[2])
     #zc = lifting_layer(c_inp, hidden[2])
     t1 = None
-    for t in range(NT1):
+    for t in range(nt1):
         if t==0:
             t1 = conditional_recurrent_decoder(x3, zc[...,t,:], [x2, x1], rnn_filters=hidden)
         else:
             t1 = conditional_recurrent_decoder(x3, zc[...,t,:], [x2, x1], rnn_filters=hidden, previous_timestep=t1) 
     t1 = layers.TimeDistributed(layers.SeparableConv2D(Y1_CHANNELS, 3, activation='relu', padding='same'))(t1)
+    model1 = Model(inputs=[x_inp, c_inp], outputs=t1)
 
+    w1 = encoder_layer(x_inp, hidden[0])
+    w2 = encoder_layer(w1, hidden[1])
+    w3 = encoder_layer(w2, hidden[2])
+    wc, _ = lifting_attention_layer(c_inp, hidden[2])
     t2 = None
-    for t in range(NT2):
+    for t in range(nt2):
         if t==0:
-            t2 = conditional_recurrent_decoder(x3, zc[...,t,:], [x2, x1], rnn_filters=hidden, out_channels=Y2_CHANNELS)
+            t2 = conditional_recurrent_decoder(w3, wc[...,t,:], [w2, w1], rnn_filters=hidden, out_channels=Y2_CHANNELS)
         else:
-            t2 = conditional_recurrent_decoder(x3, zc[...,t,:], [x2, x1], rnn_filters=hidden, out_channels=Y2_CHANNELS, previous_timestep=t2)
+            t2 = conditional_recurrent_decoder(w3, wc[...,t,:], [w2, w1], rnn_filters=hidden, out_channels=Y2_CHANNELS, previous_timestep=t2)
     t2 = layers.TimeDistributed(layers.Conv2D(Y2_CHANNELS, 3, activation='sigmoid', padding='same'))(t2)
+    model2 = Model(inputs=[x_inp, c_inp], outputs=t2)
 
-    model = Model(inputs=[x_inp, c_inp], outputs=[t1, t2])
-    if verbose: print('# parameters: {:,}'.format(model.count_params()))
-    return model
+    if verbose: print('# parameters: {:,} | {:,}'.format(model1.count_params(), model2.count_params()))
+    return model1, model2
+
 
 @keras.saving.register_keras_serializable()
 class CustomLoss(losses.Loss):
