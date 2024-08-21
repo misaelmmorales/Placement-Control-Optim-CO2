@@ -57,7 +57,7 @@ def check_tf_gpu():
     return None
 check_tf_gpu()
 
-deltatime = sio.loadmat('simulations/data/time_arr.mat', simplify_cells=True)['time_arr']
+deltatime = sio.loadmat('data/time_arr.mat', simplify_cells=True)['time_arr']
 timesteps = np.cumsum(deltatime)
 timesteps_inj = timesteps[:20]
 timesteps_mon = timesteps[[21, 24, 29, 34, 39]]
@@ -66,10 +66,10 @@ print('injection: {}'.format(timesteps_inj))
 print('monitoring: {}'.format(timesteps_mon))
 
 # Load data
-X_data = np.load('simulations/data/X_data.npy')
-c_data = np.load('simulations/data/c_data.npy')
-y1_data = np.load('simulations/data/y1_data.npy')
-y2_data = np.load('simulations/data/y2_data.npy')[:,[1,4,9,14,19]]
+X_data = np.load('data/X_data.npy')   # (poro,perm,well,tops,heights)
+c_data = np.load('data/c_data.npy')   # (controls)
+y1_data = np.load('data/y1_data.npy') # (pressure,saturation)_inj
+y2_data = np.load('data/y2_data.npy') # (saturation)_monitor
 print('X: {} | c: {}'.format(X_data.shape, c_data.shape))
 print('y1: {} | y2: {}'.format(y1_data.shape, y2_data.shape))
 
@@ -78,7 +78,7 @@ pmu, psd = X_data[...,0].mean(), X_data[...,0].std() # porosity
 kmu, ksd = X_data[...,1].mean(), X_data[...,1].std() # permeability
 wmi, wma = X_data[...,2].min(),  X_data[...,2].max() # wells
 tmi, tma = X_data[...,3].min(),  X_data[...,3].max() # tops
-vmi, vma = X_data[...,4].min(),  X_data[...,4].max() # volumes
+vmi, vma = X_data[...,4].min(),  X_data[...,4].max() # heights
 cmi, cma = c_data.min(),         c_data.max()        # controls
 
 X_data[...,0] = (X_data[...,0] - pmu) / (3.33*psd)
@@ -86,11 +86,11 @@ X_data[...,1] = (X_data[...,1] - kmu) / (3.33*ksd)
 X_data[...,2] = (X_data[...,2] - wmi) / (wma - wmi)
 X_data[...,3] = (X_data[...,3] - tmi) / (tma - tmi)
 X_data[...,4] = (X_data[...,4] - vmi) / (vma - vmi)
-c_data = c_data / 2.0
+c_data = c_data / 5.0
 
-y1_data[...,0]  = y1_data[...,0]  / 50e3
-y1_data[...,-1] = y1_data[...,-1] / 0.7
-y2_data[...,-1] = y2_data[...,-1] / 0.7
+y1_data[...,0]  = y1_data[...,0]  / 5e5
+y1_data[...,-1] = y1_data[...,-1] / 1
+y2_data[...,-1] = y2_data[...,-1] / 1
 
 print('porosity     - min: {:.2f} | max: {:.2f}'.format(X_data[...,0].min(), X_data[...,0].max()))
 print('logperm      - min: {:.2f} | max: {:.2f}'.format(X_data[...,1].min(), X_data[...,1].max()))
@@ -117,14 +117,14 @@ test_idx  = np.setdiff1d(range(len(X_data)), train_idx)
 # y1_test = y1_data[test_idx].astype(np.float32)
 # y2_test = y2_data[test_idx].astype(np.float32)
 
-X_train  = tf.cast(X_data[train_idx], tf.float32)
-c_train  = tf.cast(c_data[train_idx], tf.float32)
+X_train  = tf.cast(X_data[train_idx],  tf.float32)
+c_train  = tf.cast(c_data[train_idx],  tf.float32)
 y1_train = tf.cast(y1_data[train_idx], tf.float32)
 y2_train = tf.cast(y2_data[train_idx], tf.float32)
-X_test  = tf.cast(X_data[test_idx], tf.float32)
-c_test  = tf.cast(c_data[test_idx], tf.float32)
-y1_test = tf.cast(y1_data[test_idx], tf.float32)
-y2_test = tf.cast(y2_data[test_idx], tf.float32)
+X_test   = tf.cast(X_data[test_idx],   tf.float32)
+c_test   = tf.cast(c_data[test_idx],   tf.float32)
+y1_test  = tf.cast(y1_data[test_idx],  tf.float32)
+y2_test  = tf.cast(y2_data[test_idx],  tf.float32)
 
 print('-'*70)
 print('X_train:  {}     | c_train: {}'.format(X_train.shape, c_train.shape))

@@ -11,8 +11,8 @@ gravity on;  g = gravity;
 
 %% Make Grid
 [G, Gt, ~, ~, bcIx, bcIxVE] = makeModel(32,1);
-save('grids/G.mat', 'G')
-save('grids/Gt.mat', 'Gt')
+%save('grids/G.mat', 'G')
+%save('grids/Gt.mat', 'Gt')
 
 figure(1); clf; plotCellData(G, G.cells.centroids(:,3)); view(3); colormap jet; colorbar
 figure(2); clf; plotCellData(Gt, Gt.cells.z); view(3); colormap jet; colorbar

@@ -110,14 +110,16 @@ def make_model(hidden=[8, 16, 64], verbose:bool=True):
         else:
             t1 = conditional_recurrent_decoder(x3, zc[...,t,:], [x2, x1], rnn_filters=hidden, previous_timestep=t1) 
 
+    ww = layers.Concatenate(axis=-1)([x_inp, t1[:,-1]])
+    w1 = encoder_layer(ww, hidden[0])
+    w2 = encoder_layer(w1, hidden[1])
+    w3 = encoder_layer(w2, hidden[2])
     t2 = None
     for t in range(NT2):
         if t==0:
-            t2 = unconditional_recurrent_decoder(x3, [x2, x1], rnn_filters=hidden)
-            td = layers.Reshape((1, NX, NY, 1))(t1[:,-1,...,-1])
-            t2 = layers.Multiply()([t2, td])
+            t2 = unconditional_recurrent_decoder(w3, [w2, w1], rnn_filters=hidden)
         else:
-            t2 = unconditional_recurrent_decoder(x3, [x2, x1], rnn_filters=hidden, previous_timestep=t2)
+            t2 = unconditional_recurrent_decoder(w3, [w2, w1], rnn_filters=hidden, previous_timestep=t2)
     
     model = Model(inputs=[x_inp, c_inp], outputs=[t1, t2])
     if verbose: print('# parameters: {:,}'.format(model.count_params()))

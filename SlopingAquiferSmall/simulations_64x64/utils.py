@@ -11,7 +11,7 @@ from torchmetrics.image import PeakSignalNoiseRatio as PSNRLoss
 
 from neuralop.models import FNO
 from neuralop.layers.spectral_convolution import SpectralConv
-from convlstm import ConvLSTM
+from SlopingAquiferSmall.simulationsVE.convlstm import ConvLSTM
 
 NR, NT = 1272, 60
 NX, NY = 64, 64
