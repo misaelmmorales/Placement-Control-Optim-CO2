@@ -67,10 +67,12 @@ for i in tqdm(range(NUM_REALIZATIONS)):
         saturation[i,t] = d[t]['s'].reshape(NX,NY,order='F')
 
 y1_data = np.stack([pressure[:,:NT1], saturation[:,:NT1]], axis=-1)
-y2_data = np.expand_dims(saturation[:,NT1:], -1)[:,[0,4,9,14,19]]
+y2_data = np.expand_dims(saturation[:,NT1:], -1) #[:,[0,4,9,14,19]]
 print('y1_data: {} | y2_data: {}'.format(y1_data.shape, y2_data.shape))
 
 np.save('data/X_data.npy', X_data)
 np.save('data/c_data.npy', c_data)
 np.save('data/y1_data.npy', y1_data)
 np.save('data/y2_data.npy', y2_data)
+
+print('... Done!')

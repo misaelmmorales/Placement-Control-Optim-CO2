@@ -12,10 +12,9 @@ import keras
 import tensorflow as tf
 from keras import Model, layers, regularizers, optimizers, losses, callbacks, metrics
 
-from pix2vid2 import make_model, MonitorCallback
-from pix2vid2 import CustomLoss, custom_loss
+from pix2vid2 import make_model, MonitorCallback, CustomLoss
 
-NUM_REALIZATIONS = 929
+NUM_REALIZATIONS = 1000
 X_CHANNELS  = 5
 Y1_CHANNELS = 2
 Y2_CHANNELS = 1
@@ -24,15 +23,15 @@ NY = 64
 NZ = 1
 NTT = 40
 NT1 = 20
-NT2 = 5
-HIDDEN = [16, 64, 256]
+NT2 = 5 #10
+HIDDEN = [16, 64, 128]
 
-NTRAIN = 800
-EPOCHS = 30
+NTRAIN = 500
+EPOCHS = 100
 MONITOR = 5
 BATCH_SIZE = 8
 LEARNING_RATE = 1e-3
-WEIGHT_DECAY = 1e-6
+WEIGHT_DECAY = 5e-8
 PATIENCE = 20
 
 sec2year   = 365.25 * 24 * 60 * 60
@@ -60,7 +59,7 @@ check_tf_gpu()
 deltatime = sio.loadmat('data/time_arr.mat', simplify_cells=True)['time_arr']
 timesteps = np.cumsum(deltatime)
 timesteps_inj = timesteps[:20]
-timesteps_mon = timesteps[[21, 24, 29, 34, 39]]
+timesteps_mon = timesteps[20:][[0, 4, 9, 14, 19]]
 print('timesteps: {} | deltatime: {}'.format(len(timesteps), np.unique(deltatime)))
 print('injection: {}'.format(timesteps_inj))
 print('monitoring: {}'.format(timesteps_mon))
@@ -71,6 +70,8 @@ c_data = np.load('data/c_data.npy')   # (controls)
 y1_data = np.load('data/y1_data.npy') # (pressure,saturation)_inj
 y2_data = np.load('data/y2_data.npy') # (saturation)_monitor
 print('X: {} | c: {}'.format(X_data.shape, c_data.shape))
+#y2_data = y2_data[:,[0, 2, 4, 6, 8, 10, 12, 14, 16, 18]]
+y2_data = y2_data[:, [0, 4, 9, 14, 19]]
 print('y1: {} | y2: {}'.format(y1_data.shape, y2_data.shape))
 
 # Normalize data
@@ -139,14 +140,14 @@ mcCallback = callbacks.ModelCheckpoint('pix2vid-opt-v2.keras', monitor='val_accu
 customCBs  = [MonitorCallback(monitor=10), esCallback, mcCallback]
 
 model = make_model(hidden=HIDDEN)
-optimizer = optimizers.AdamW(learning_rate=LEARNING_RATE, weight_decay=WEIGHT_DECAY)
-model.compile(optimizer=optimizer, loss=CustomLoss(), metrics=['mse','mse'])
+optimizer = optimizers.Adam(learning_rate=LEARNING_RATE)#, weight_decay=WEIGHT_DECAY)
+model.compile(optimizer=optimizer, loss=CustomLoss(b=0.75, a=0.4), metrics=['mse','mse'])
 
 start = time()
 fit = model.fit(x=[X_train, c_train], y=[y1_train, y2_train],
                 batch_size       = BATCH_SIZE,
                 epochs           = EPOCHS,
-                validation_split = 0.2,
+                validation_split = 0.25,
                 shuffle          = True,
                 callbacks        = [MonitorCallback(monitor=MONITOR)],
                 verbose          = 0)
