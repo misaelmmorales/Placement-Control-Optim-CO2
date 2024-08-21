@@ -129,16 +129,9 @@ def make_model(hidden=[8, 16, 64], verbose:bool=True):
     if verbose: print('# parameters: {:,}'.format(model.count_params()))
     return model
 
-def custom_loss(true, pred, a=(3/4), b=(4/5)):
-    ssim_loss  = tf.reduce_mean(1.0 - tf.image.ssim(true, pred, max_val=1.0))
-    mse_loss   = tf.reduce_mean(tf.square(true - pred))
-    mae_loss   = tf.reduce_mean(tf.abs(true - pred))
-    pixel_loss = b * mse_loss + (1 - b) * mae_loss
-    return a * pixel_loss + (1 - a) * ssim_loss
-
 @keras.saving.register_keras_serializable()
 class CustomLoss(losses.Loss):
-    def __init__(self, a=0.75, b=0.8, name='custom_loss'):
+    def __init__(self, a=(2/3), b=(4/5), name='custom_loss'):
         super(CustomLoss, self).__init__(name=name)
         self.a = a
         self.b = b
