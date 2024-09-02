@@ -71,22 +71,22 @@ time_arr = [repmat(timesteps(3)/year, timesteps(2)/timesteps(3), 1);
             repmat(timesteps(4)/year, (timesteps(1)-timesteps(2))/timesteps(4), 1)];
 save('data/time_arr.mat', 'time_arr')
 
-total_inj  = (20 / (timesteps(2)/year) ); % 20 MT over 10 yrs = 2 MT/yr
+total_inj  = (30 / (timesteps(2)/year) ); % 30 MT over 10 yrs = 3 MT/yr
 min_inj    = 0.2; % in MT CO2
 conversion = rhoc * year / 1e3 / mega;
 
 %% Run Simulation
-parfor i=0:1271
-    
-    i = 222;
-    
+parfor i=0:999
+        
     [rock]            = gen_rock(i, perm, poro, facies);
-    [W, WVE, wellIx]  = gen_wells(G, Gt, rock);
+    [W, ~, wellIx]    = gen_wells(G, Gt, rock);
     [controls]        = gen_controls(timesteps, total_inj, min_inj, W, fluid);
     [schedule]        = gen_schedule(timesteps, W, bc, controls);
     [wellSol, states] = gen_ADsimulation(G, rock, fluid, initState, schedule);
 
-    figure(2); clf; plotToolbar(G,states); view(3); colormap jet; colorbar
+    figure(1); clf; plotCellData(G, rock.poro); colormap jet; colorbar
+    figure(2); clf; plotCellData(G, log10(convertTo(rock.perm(:,1), milli*darcy))); colormap jet; colorbar
+    figure(3); clf; plotToolbar(G,states); view(3); colormap jet; colorbar
 
     parsave(sprintf('states/states_%d', i), states);
     parsave(sprintf('controls/controls_%d', i), controls*conversion);

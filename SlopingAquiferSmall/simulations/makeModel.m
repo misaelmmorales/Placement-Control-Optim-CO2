@@ -38,7 +38,7 @@ end
 clear x y T B;
 %
 
-%G = cartGrid([2*m, 2*m, n], [10,10,5]*meter);
+%G = cartGrid([2*m, 2*m, n], [60,60,5]*meter);
 
 G.nodes.coords(:,1:2) = G.nodes.coords(:,1:2)*125; %200;
 G.nodes.coords(:,3) = G.nodes.coords(:,3)*15+1000;

@@ -3,7 +3,7 @@ function [W, WVE, wellIx] = gen_wells(CG, Gt, rock)
 %   Detailed explanation goes here
 
     num_wells = randi([1,5]);
-    wellIx    = randi([8,32], [num_wells,2]);
+    wellIx    = randi([8,56], [num_wells,2]);
 
     %R_inj = (1/num_wells) * 0.5 * 556.2 * 1000 * meter^3 / year; %0.5 MT/yr
     
