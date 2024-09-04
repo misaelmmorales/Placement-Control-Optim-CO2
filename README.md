@@ -1,9 +1,6 @@
 # Placement-Control-Optim-CO2
 Misael M. Morales, Carlos Torres-Verdin, and Michael Pyrcz. (in preparation). Well placement and control optimization for geologic CO<sub>2</sub> storage prediction under geologic uncertainty using a spatiotemporal deep learning proxy.
 
-Notes: 
-- objective function: minimize plume area, minimize risk of leakage well, minimize risk of fault transmissibility
-
 <p align="center">
   <img src="https://github.com/misaelmmorales/Placement-Control-Optim-CO2/blob/main/SlopingAquiferSmall/figures/inputs.png" width="1000"/>
   <img src="https://github.com/misaelmmorales/Placement-Control-Optim-CO2/blob/main/SlopingAquiferSmall/figures/controls.png" width="1000"/>
