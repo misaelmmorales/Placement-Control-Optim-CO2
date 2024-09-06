@@ -5,6 +5,8 @@ Misael M. Morales, Carlos Torres-Verdin, and Michael Pyrcz. (in preparation). We
   <img src="https://github.com/misaelmmorales/Placement-Control-Optim-CO2/blob/main/SlopingAquiferSmall/figures/inputs.png" width="1000"/>
   <img src="https://github.com/misaelmmorales/Placement-Control-Optim-CO2/blob/main/SlopingAquiferSmall/figures/controls.png" width="1000"/>
   <img src="https://github.com/misaelmmorales/Placement-Control-Optim-CO2/blob/main/SlopingAquiferSmall/figures/y2_true_s.png" width="1000"/>
+  <img src="https://github.com/misaelmmorales/Placement-Control-Optim-CO2/blob/main/sim.gif" width="1000"/>
+
 </p>
 
 
