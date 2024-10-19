@@ -1,4 +1,4 @@
-# Placement-Control-Optim-CO2
+# Placement-Control Optimization CO2
 Misael M. Morales, Carlos Torres-Verdin, and Michael Pyrcz. (in preparation). Well placement and control optimization for geologic CO<sub>2</sub> storage prediction under geologic uncertainty using a spatiotemporal deep learning proxy.
 
 <p align="center">
