@@ -22,6 +22,7 @@ from tensorflow_addons.optimizers import AdamW
 from tensorflow.image import ssim as SSIM
 from tensorflow.keras.metrics import mean_squared_error as MSE
 from tensorflow.keras.callbacks import LearningRateScheduler, ReduceLROnPlateau
+
 def check_tensorflow_gpu():
     sys_info = tf.sysconfig.get_build_info()
     cuda_version, cudnn_version = sys_info['cuda_version'], sys_info['cudnn_version']
